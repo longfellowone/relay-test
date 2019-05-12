@@ -11,6 +11,9 @@ export default App;
 // "proxy": "http://localhost:0000" in package.json
 // import graphql from 'babel-plugin-relay/macro';
 
+// useInterval hook to refresh token?
+// https://overreacted.io/making-setinterval-declarative-with-react-hooks/
+
 // const print = <T extends {}>(msg: T): T => {
 //   return msg;
 // };

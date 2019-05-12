@@ -5,8 +5,71 @@
 # orderProcess
 # orderCreate
 
+# https://graphqlmastery.com/blog/graphql-interfaces-and-unions-how-to-design-graphql-schema
+
+# Node interface type:id
+# https://medium.com/code-oil/relay-graphql-de-mystifying-node-id-38757121b9c
+
+#   def self.resolve_type(type, obj, ctx)
+#     case obj
+#     when Post
+#       Types::PostType
+#     when Comment
+#       Types::CommentType
+#     else
+#       raise("Unexpected object: #{obj}")
+#     end
+#   end
+
+# id: globalIdField('User'),
+
+# Use node interface instead?
+# orderById
+# ordersByProjectId
+# ordersByOrganizationId
+
+# isReadyToSend -> check all has quantity
+
 # use enums for status
-# DateTime? 
+# DateTime?
 
 # [userError] -> message!, [field!] | String
 # payload fields nullable, name: type, no !
+
+interface Node {
+  id: ID!
+}
+
+type Faction implements Node {
+  id: ID!
+  name: String
+  ships: ShipConnection
+}
+
+type ShipConnection {
+  edges: [ShipEdge]
+  pageInfo: PageInfo!
+}
+
+type ShipEdge {
+  cursor: String!
+  node: Ship
+}
+
+type Ship implements Node {
+  id: ID!
+  name: String
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+type Query {
+  rebels: Faction
+  empire: Faction
+  node(id: ID!): Node
+}
