@@ -1,0 +1,26 @@
+settings:
+  legacy:
+    force: false
+    interval: 0s
+schema:
+- name: server
+  path: .
+  env:
+    myvar: value
+  commands:
+    install:
+      status: true
+      method: go build -o server # <path/to/built/binary>
+    run:
+      status: true
+      method: ./server
+  watcher:
+    extensions:
+    - go
+    paths:
+    - /
+    ignore:
+      paths:
+      - .git
+      - .realize
+      - vendor

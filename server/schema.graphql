@@ -40,25 +40,35 @@ interface Node {
   id: ID!
 }
 
-type Faction implements Node {
-  id: ID!
-  name: String
-  ships: ShipConnection
+type Query {
+  user(id: String): User
+  node(
+    id: ID!
+  ): Node
 }
 
-type ShipConnection {
-  edges: [ShipEdge]
+type User implements Node {
+  id: ID!
+  userId: String!
+  todos(status: String = "any", after: String, first: Int, before: String, last: Int): TodoConnection
+  totalCount: Int!
+  completedCount: Int!
+}
+
+type Todo implements Node {
+  id: ID!
+  text: String!
+  complete: Boolean!
+}
+
+type TodoConnection {
   pageInfo: PageInfo!
+  edges: [TodoEdge]
 }
 
-type ShipEdge {
+type TodoEdge {
+  node: Todo
   cursor: String!
-  node: Ship
-}
-
-type Ship implements Node {
-  id: ID!
-  name: String
 }
 
 type PageInfo {
@@ -66,10 +76,4 @@ type PageInfo {
   hasPreviousPage: Boolean!
   startCursor: String
   endCursor: String
-}
-
-type Query {
-  rebels: Faction
-  empire: Faction
-  node(id: ID!): Node
 }
