@@ -10,6 +10,8 @@
 # Node interface type:id
 # https://medium.com/code-oil/relay-graphql-de-mystifying-node-id-38757121b9c
 
+# https://github.com/relayjs/relay-examples/blob/master/todo/data/schema/nodes.js
+
 #   def self.resolve_type(type, obj, ctx)
 #     case obj
 #     when Post
@@ -49,16 +51,9 @@ type Query {
 
 type User implements Node {
   id: ID!
-  userId: String!
-  todos(status: String = "any", after: String, first: Int, before: String, last: Int): TodoConnection
+  todos(after: String, first: Int, before: String, last: Int): TodoConnection
   totalCount: Int!
   completedCount: Int!
-}
-
-type Todo implements Node {
-  id: ID!
-  text: String!
-  complete: Boolean!
 }
 
 type TodoConnection {
@@ -69,6 +64,12 @@ type TodoConnection {
 type TodoEdge {
   node: Todo
   cursor: String!
+}
+
+type Todo implements Node {
+  id: ID!
+  text: String!
+  complete: Boolean!
 }
 
 type PageInfo {
