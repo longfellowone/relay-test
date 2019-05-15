@@ -6,6 +6,24 @@ type Node interface {
 	IsNode()
 }
 
+type Order struct {
+	ID      string   `json:"id"`
+	Project Project  `json:"project"`
+	Items   []string `json:"items"`
+}
+
+func (Order) IsNode() {}
+
+type OrderConnection struct {
+	PageInfo PageInfo     `json:"pageInfo"`
+	Edges    []*OrderEdge `json:"edges"`
+}
+
+type OrderEdge struct {
+	Node   *Order `json:"node"`
+	Cursor string `json:"cursor"`
+}
+
 type PageInfo struct {
 	HasNextPage     bool    `json:"hasNextPage"`
 	HasPreviousPage bool    `json:"hasPreviousPage"`
@@ -13,29 +31,9 @@ type PageInfo struct {
 	EndCursor       *string `json:"endCursor"`
 }
 
-type Todo struct {
-	ID       string `json:"id"`
-	Text     string `json:"text"`
-	Complete bool   `json:"complete"`
+type Project struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
-func (Todo) IsNode() {}
-
-type TodoConnection struct {
-	PageInfo PageInfo    `json:"pageInfo"`
-	Edges    []*TodoEdge `json:"edges"`
-}
-
-type TodoEdge struct {
-	Node   *Todo  `json:"node"`
-	Cursor string `json:"cursor"`
-}
-
-type User struct {
-	ID             string          `json:"id"`
-	Todos          *TodoConnection `json:"todos"`
-	TotalCount     int             `json:"totalCount"`
-	CompletedCount int             `json:"completedCount"`
-}
-
-func (User) IsNode() {}
+func (Project) IsNode() {}

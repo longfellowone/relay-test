@@ -13,14 +13,29 @@ resolver:
   filename: resolver.go
   type: Resolver
 
-models:
-  User:
-    fields:
-      todos:
-        resolver: true # force a resolver to be generated
-  TodoConnection:
-    fields:
-      pageInfo:
-        resolver: true # force a resolver to be generated
-      edges:
-        resolver: true # force a resolver to be generated
+#models:
+#  OrderConnection:
+#    fields:
+#      pageInfo:
+#        resolver: true # force a resolver to be generated
+#      edges:
+#        resolver: true # force a resolver to be generated
+
+#  Order:
+#    fields:
+#      project:
+#        resolver: true # force a resolver to be generated
+
+
+
+#models:
+#  User:
+#    fields:
+#      todos:
+#        resolver: true # force a resolver to be generated
+#  TodoConnection:
+#    fields:
+#      pageInfo:
+#        resolver: true # force a resolver to be generated
+#      edges:
+#        resolver: true # force a resolver to be generated

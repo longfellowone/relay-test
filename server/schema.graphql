@@ -1,75 +1,33 @@
-# orderAddProduct(orderId, itemId)
-# orderRemoveProduct
-# orderReceiveItem
-# orderSend
-# orderProcess
-# orderCreate
-
-# https://graphqlmastery.com/blog/graphql-interfaces-and-unions-how-to-design-graphql-schema
-
-# Node interface type:id
-# https://medium.com/code-oil/relay-graphql-de-mystifying-node-id-38757121b9c
-
-# https://github.com/relayjs/relay-examples/blob/master/todo/data/schema/nodes.js
-
-#   def self.resolve_type(type, obj, ctx)
-#     case obj
-#     when Post
-#       Types::PostType
-#     when Comment
-#       Types::CommentType
-#     else
-#       raise("Unexpected object: #{obj}")
-#     end
-#   end
-
-# id: globalIdField('User'),
-
-# Use node interface instead?
-# orderById
-# ordersByProjectId
-# ordersByOrganizationId
-
-# isReadyToSend -> check all has quantity
-
-# use enums for status
-# DateTime?
-
-# [userError] -> message!, [field!] | String
-# payload fields nullable, name: type, no !
-
 interface Node {
   id: ID!
 }
 
 type Query {
-  user(id: String): User
-  node(
-    id: ID!
-  ): Node
+  orders(projectId: String, after: String, first: Int, before: String, last: Int): OrderConnection
+  # projects: (after: String, first: Int, before: String, last: Int): ProjectConnection # get org ID from context
+  node(id: ID!): Node
 }
 
-type User implements Node {
+type Order implements Node {
   id: ID!
-  todos(after: String, first: Int, before: String, last: Int): TodoConnection
-  totalCount: Int!
-  completedCount: Int!
+  project: Project!
+  items: [String!]!
 }
 
-type TodoConnection {
+type OrderConnection {
   pageInfo: PageInfo!
-  edges: [TodoEdge]
+  edges: [OrderEdge]
 }
 
-type TodoEdge {
-  node: Todo
+type OrderEdge {
+  node: Order
   cursor: String!
 }
 
-type Todo implements Node {
+type Project implements Node {
   id: ID!
-  text: String!
-  complete: Boolean!
+  name: String!
+  # orders: OrderConnection
 }
 
 type PageInfo {
