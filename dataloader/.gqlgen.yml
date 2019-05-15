@@ -1,5 +1,7 @@
+# Use time scalar
 models:
   Order:
     model: dataloader.Order
   Customer:
     model: dataloader.Customer
+

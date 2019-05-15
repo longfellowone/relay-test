@@ -47,7 +47,7 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 				addresses := make([]*Address, len(keys))
 				errors := make([]error, len(keys))
 				for i, key := range keys {
-					addresses[i] = &Address{Street: "home street", Country: "hometon " + strconv.Itoa(key)}
+					addresses[i] = &Address{ID: key, Street: "home street", Country: "hometon " + strconv.Itoa(key)}
 				}
 				return addresses, errors
 			},

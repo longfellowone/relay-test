@@ -1,5 +1,8 @@
 //go:generate go run github.com/99designs/gqlgen
 
+// Move data loaders to new folder
+// Rename customer to project
+
 package dataloader
 
 import (
