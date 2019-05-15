@@ -1,11 +1,44 @@
+interface Node {
+    id: ID!
+}
+
+type Test implements Node {
+    id: ID!
+    test: String!
+}
+
 type Query {
     customers: [Customer!]
+    projects: [Project!]
+}
+
+type Project implements Node{
+    id: ID!
+    name: String!
+    orders(after: String, first: Int, before: String, last: Int): OrderConnection
+}
+
+type OrderConnection {
+    pageInfo: PageInfo!
+    edges: [OrderEdge]
+}
+
+type OrderEdge {
+    node: Order
+    cursor: String!
+}
+
+type PageInfo {
+    hasNextPage: Boolean!
+    hasPreviousPage: Boolean!
+    startCursor: String
+    endCursor: String
 }
 
 type Customer {
     id: Int!
     name: String!
-    address: Address
+#    address: Address
     orders: [Order!]
 }
 
@@ -18,8 +51,7 @@ type Address {
 type Order {
     id: Int!
     date: Time!
-    amount: Float!
-    items: [Item!]
+#    items: [Item!]
 }
 
 type Item {

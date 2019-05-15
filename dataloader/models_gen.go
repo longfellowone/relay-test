@@ -2,6 +2,10 @@
 
 package dataloader
 
+type Node interface {
+	IsNode()
+}
+
 type Address struct {
 	ID      int    `json:"id"`
 	Street  string `json:"street"`
@@ -11,3 +15,27 @@ type Address struct {
 type Item struct {
 	Name string `json:"name"`
 }
+
+type OrderConnection struct {
+	PageInfo PageInfo     `json:"pageInfo"`
+	Edges    []*OrderEdge `json:"edges"`
+}
+
+type OrderEdge struct {
+	Node   *Order `json:"node"`
+	Cursor string `json:"cursor"`
+}
+
+type PageInfo struct {
+	HasNextPage     bool    `json:"hasNextPage"`
+	HasPreviousPage bool    `json:"hasPreviousPage"`
+	StartCursor     *string `json:"startCursor"`
+	EndCursor       *string `json:"endCursor"`
+}
+
+type Test struct {
+	ID   string `json:"id"`
+	Test string `json:"test"`
+}
+
+func (Test) IsNode() {}
