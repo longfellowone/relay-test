@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/99designs/gqlgen/graphql"
@@ -90,6 +91,7 @@ type ComplexityRoot struct {
 
 	Query struct {
 		Customers func(childComplexity int) int
+		Node      func(childComplexity int, id string) int
 		Projects  func(childComplexity int) int
 	}
 
@@ -100,14 +102,15 @@ type ComplexityRoot struct {
 }
 
 type CustomerResolver interface {
-	Orders(ctx context.Context, obj *Customer) ([]Order, error)
+	Orders(ctx context.Context, obj *Customer) ([]*Order, error)
 }
 type ProjectResolver interface {
 	Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error)
 }
 type QueryResolver interface {
-	Customers(ctx context.Context) ([]Customer, error)
-	Projects(ctx context.Context) ([]Project, error)
+	Customers(ctx context.Context) ([]*Customer, error)
+	Projects(ctx context.Context) ([]*Project, error)
+	Node(ctx context.Context, id string) (Node, error)
 }
 
 type executableSchema struct {
@@ -125,140 +128,140 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	_ = ec
 	switch typeName + "." + field {
 
-	case "Address.Country":
+	case "Address.country":
 		if e.complexity.Address.Country == nil {
 			break
 		}
 
 		return e.complexity.Address.Country(childComplexity), true
 
-	case "Address.ID":
+	case "Address.id":
 		if e.complexity.Address.ID == nil {
 			break
 		}
 
 		return e.complexity.Address.ID(childComplexity), true
 
-	case "Address.Street":
+	case "Address.street":
 		if e.complexity.Address.Street == nil {
 			break
 		}
 
 		return e.complexity.Address.Street(childComplexity), true
 
-	case "Customer.ID":
+	case "Customer.id":
 		if e.complexity.Customer.ID == nil {
 			break
 		}
 
 		return e.complexity.Customer.ID(childComplexity), true
 
-	case "Customer.Name":
+	case "Customer.name":
 		if e.complexity.Customer.Name == nil {
 			break
 		}
 
 		return e.complexity.Customer.Name(childComplexity), true
 
-	case "Customer.Orders":
+	case "Customer.orders":
 		if e.complexity.Customer.Orders == nil {
 			break
 		}
 
 		return e.complexity.Customer.Orders(childComplexity), true
 
-	case "Item.Name":
+	case "Item.name":
 		if e.complexity.Item.Name == nil {
 			break
 		}
 
 		return e.complexity.Item.Name(childComplexity), true
 
-	case "Order.Date":
+	case "Order.date":
 		if e.complexity.Order.Date == nil {
 			break
 		}
 
 		return e.complexity.Order.Date(childComplexity), true
 
-	case "Order.ID":
+	case "Order.id":
 		if e.complexity.Order.ID == nil {
 			break
 		}
 
 		return e.complexity.Order.ID(childComplexity), true
 
-	case "OrderConnection.Edges":
+	case "OrderConnection.edges":
 		if e.complexity.OrderConnection.Edges == nil {
 			break
 		}
 
 		return e.complexity.OrderConnection.Edges(childComplexity), true
 
-	case "OrderConnection.PageInfo":
+	case "OrderConnection.pageInfo":
 		if e.complexity.OrderConnection.PageInfo == nil {
 			break
 		}
 
 		return e.complexity.OrderConnection.PageInfo(childComplexity), true
 
-	case "OrderEdge.Cursor":
+	case "OrderEdge.cursor":
 		if e.complexity.OrderEdge.Cursor == nil {
 			break
 		}
 
 		return e.complexity.OrderEdge.Cursor(childComplexity), true
 
-	case "OrderEdge.Node":
+	case "OrderEdge.node":
 		if e.complexity.OrderEdge.Node == nil {
 			break
 		}
 
 		return e.complexity.OrderEdge.Node(childComplexity), true
 
-	case "PageInfo.EndCursor":
+	case "PageInfo.endCursor":
 		if e.complexity.PageInfo.EndCursor == nil {
 			break
 		}
 
 		return e.complexity.PageInfo.EndCursor(childComplexity), true
 
-	case "PageInfo.HasNextPage":
+	case "PageInfo.hasNextPage":
 		if e.complexity.PageInfo.HasNextPage == nil {
 			break
 		}
 
 		return e.complexity.PageInfo.HasNextPage(childComplexity), true
 
-	case "PageInfo.HasPreviousPage":
+	case "PageInfo.hasPreviousPage":
 		if e.complexity.PageInfo.HasPreviousPage == nil {
 			break
 		}
 
 		return e.complexity.PageInfo.HasPreviousPage(childComplexity), true
 
-	case "PageInfo.StartCursor":
+	case "PageInfo.startCursor":
 		if e.complexity.PageInfo.StartCursor == nil {
 			break
 		}
 
 		return e.complexity.PageInfo.StartCursor(childComplexity), true
 
-	case "Project.ID":
+	case "Project.id":
 		if e.complexity.Project.ID == nil {
 			break
 		}
 
 		return e.complexity.Project.ID(childComplexity), true
 
-	case "Project.Name":
+	case "Project.name":
 		if e.complexity.Project.Name == nil {
 			break
 		}
 
 		return e.complexity.Project.Name(childComplexity), true
 
-	case "Project.Orders":
+	case "Project.orders":
 		if e.complexity.Project.Orders == nil {
 			break
 		}
@@ -270,28 +273,40 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Project.Orders(childComplexity, args["after"].(*string), args["first"].(*int), args["before"].(*string), args["last"].(*int)), true
 
-	case "Query.Customers":
+	case "Query.customers":
 		if e.complexity.Query.Customers == nil {
 			break
 		}
 
 		return e.complexity.Query.Customers(childComplexity), true
 
-	case "Query.Projects":
+	case "Query.node":
+		if e.complexity.Query.Node == nil {
+			break
+		}
+
+		args, err := ec.field_Query_node_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Node(childComplexity, args["id"].(string)), true
+
+	case "Query.projects":
 		if e.complexity.Query.Projects == nil {
 			break
 		}
 
 		return e.complexity.Query.Projects(childComplexity), true
 
-	case "Test.ID":
+	case "Test.id":
 		if e.complexity.Test.ID == nil {
 			break
 		}
 
 		return e.complexity.Test.ID(childComplexity), true
 
-	case "Test.Test":
+	case "Test.test":
 		if e.complexity.Test.Test == nil {
 			break
 		}
@@ -374,6 +389,7 @@ type Test implements Node {
 type Query {
     customers: [Customer!]
     projects: [Project!]
+    node(id: ID!): Node
 }
 
 type Project implements Node{
@@ -479,6 +495,20 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_node_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -667,10 +697,10 @@ func (ec *executionContext) _Customer_orders(ctx context.Context, field graphql.
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]Order)
+	res := resTmp.([]*Order)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOOrder2ᚕdataloaderᚐOrder(ctx, field.Selections, res)
+	return ec.marshalOOrder2ᚕᚖdataloaderᚐOrder(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Item_name(ctx context.Context, field graphql.CollectedField, obj *Item) graphql.Marshaler {
@@ -775,10 +805,10 @@ func (ec *executionContext) _OrderConnection_pageInfo(ctx context.Context, field
 		}
 		return graphql.Null
 	}
-	res := resTmp.(PageInfo)
+	res := resTmp.(*PageInfo)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNPageInfo2dataloaderᚐPageInfo(ctx, field.Selections, res)
+	return ec.marshalNPageInfo2ᚖdataloaderᚐPageInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _OrderConnection_edges(ctx context.Context, field graphql.CollectedField, obj *OrderConnection) graphql.Marshaler {
@@ -1061,10 +1091,10 @@ func (ec *executionContext) _Query_customers(ctx context.Context, field graphql.
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]Customer)
+	res := resTmp.([]*Customer)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOCustomer2ᚕdataloaderᚐCustomer(ctx, field.Selections, res)
+	return ec.marshalOCustomer2ᚕᚖdataloaderᚐCustomer(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_projects(ctx context.Context, field graphql.CollectedField) graphql.Marshaler {
@@ -1085,10 +1115,41 @@ func (ec *executionContext) _Query_projects(ctx context.Context, field graphql.C
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.([]Project)
+	res := resTmp.([]*Project)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOProject2ᚕdataloaderᚐProject(ctx, field.Selections, res)
+	return ec.marshalOProject2ᚕᚖdataloaderᚐProject(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_node(ctx context.Context, field graphql.CollectedField) graphql.Marshaler {
+	ctx = ec.Tracer.StartFieldExecution(ctx, field)
+	defer func() { ec.Tracer.EndFieldExecution(ctx) }()
+	rctx := &graphql.ResolverContext{
+		Object:   "Query",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+	ctx = graphql.WithResolverContext(ctx, rctx)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_node_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	rctx.Args = args
+	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
+	resTmp := ec.FieldMiddleware(ctx, nil, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Node(rctx, args["id"].(string))
+	})
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(Node)
+	rctx.Result = res
+	ctx = ec.Tracer.StartFieldChildExecution(ctx)
+	return ec.marshalONode2dataloaderᚐNode(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) graphql.Marshaler {
@@ -2059,10 +2120,10 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 var addressImplementors = []string{"Address"}
 
 func (ec *executionContext) _Address(ctx context.Context, sel ast.SelectionSet, obj *Address) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, addressImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, addressImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2070,24 +2131,24 @@ func (ec *executionContext) _Address(ctx context.Context, sel ast.SelectionSet, 
 		case "id":
 			out.Values[i] = ec._Address_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "street":
 			out.Values[i] = ec._Address_street(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "country":
 			out.Values[i] = ec._Address_country(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2096,10 +2157,10 @@ func (ec *executionContext) _Address(ctx context.Context, sel ast.SelectionSet, 
 var customerImplementors = []string{"Customer"}
 
 func (ec *executionContext) _Customer(ctx context.Context, sel ast.SelectionSet, obj *Customer) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, customerImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, customerImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2107,12 +2168,12 @@ func (ec *executionContext) _Customer(ctx context.Context, sel ast.SelectionSet,
 		case "id":
 			out.Values[i] = ec._Customer_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._Customer_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "orders":
 			field := field
@@ -2130,7 +2191,7 @@ func (ec *executionContext) _Customer(ctx context.Context, sel ast.SelectionSet,
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2139,10 +2200,10 @@ func (ec *executionContext) _Customer(ctx context.Context, sel ast.SelectionSet,
 var itemImplementors = []string{"Item"}
 
 func (ec *executionContext) _Item(ctx context.Context, sel ast.SelectionSet, obj *Item) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, itemImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, itemImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2150,14 +2211,14 @@ func (ec *executionContext) _Item(ctx context.Context, sel ast.SelectionSet, obj
 		case "name":
 			out.Values[i] = ec._Item_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2166,10 +2227,10 @@ func (ec *executionContext) _Item(ctx context.Context, sel ast.SelectionSet, obj
 var orderImplementors = []string{"Order"}
 
 func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, obj *Order) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, orderImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, orderImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2177,19 +2238,19 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 		case "id":
 			out.Values[i] = ec._Order_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "date":
 			out.Values[i] = ec._Order_date(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2198,10 +2259,10 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 var orderConnectionImplementors = []string{"OrderConnection"}
 
 func (ec *executionContext) _OrderConnection(ctx context.Context, sel ast.SelectionSet, obj *OrderConnection) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, orderConnectionImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, orderConnectionImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2209,7 +2270,7 @@ func (ec *executionContext) _OrderConnection(ctx context.Context, sel ast.Select
 		case "pageInfo":
 			out.Values[i] = ec._OrderConnection_pageInfo(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "edges":
 			out.Values[i] = ec._OrderConnection_edges(ctx, field, obj)
@@ -2218,7 +2279,7 @@ func (ec *executionContext) _OrderConnection(ctx context.Context, sel ast.Select
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2227,10 +2288,10 @@ func (ec *executionContext) _OrderConnection(ctx context.Context, sel ast.Select
 var orderEdgeImplementors = []string{"OrderEdge"}
 
 func (ec *executionContext) _OrderEdge(ctx context.Context, sel ast.SelectionSet, obj *OrderEdge) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, orderEdgeImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, orderEdgeImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2240,14 +2301,14 @@ func (ec *executionContext) _OrderEdge(ctx context.Context, sel ast.SelectionSet
 		case "cursor":
 			out.Values[i] = ec._OrderEdge_cursor(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2256,10 +2317,10 @@ func (ec *executionContext) _OrderEdge(ctx context.Context, sel ast.SelectionSet
 var pageInfoImplementors = []string{"PageInfo"}
 
 func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet, obj *PageInfo) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, pageInfoImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, pageInfoImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2267,12 +2328,12 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 		case "hasNextPage":
 			out.Values[i] = ec._PageInfo_hasNextPage(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "hasPreviousPage":
 			out.Values[i] = ec._PageInfo_hasPreviousPage(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "startCursor":
 			out.Values[i] = ec._PageInfo_startCursor(ctx, field, obj)
@@ -2283,7 +2344,7 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2292,10 +2353,10 @@ func (ec *executionContext) _PageInfo(ctx context.Context, sel ast.SelectionSet,
 var projectImplementors = []string{"Project", "Node"}
 
 func (ec *executionContext) _Project(ctx context.Context, sel ast.SelectionSet, obj *Project) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, projectImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, projectImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2303,12 +2364,12 @@ func (ec *executionContext) _Project(ctx context.Context, sel ast.SelectionSet, 
 		case "id":
 			out.Values[i] = ec._Project_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "name":
 			out.Values[i] = ec._Project_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "orders":
 			field := field
@@ -2326,7 +2387,7 @@ func (ec *executionContext) _Project(ctx context.Context, sel ast.SelectionSet, 
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2335,14 +2396,14 @@ func (ec *executionContext) _Project(ctx context.Context, sel ast.SelectionSet, 
 var queryImplementors = []string{"Query"}
 
 func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, queryImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, queryImplementors)
 
 	ctx = graphql.WithResolverContext(ctx, &graphql.ResolverContext{
 		Object: "Query",
 	})
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2369,6 +2430,17 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				res = ec._Query_projects(ctx, field)
 				return res
 			})
+		case "node":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_node(ctx, field)
+				return res
+			})
 		case "__type":
 			out.Values[i] = ec._Query___type(ctx, field)
 		case "__schema":
@@ -2378,7 +2450,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2387,10 +2459,10 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 var testImplementors = []string{"Test", "Node"}
 
 func (ec *executionContext) _Test(ctx context.Context, sel ast.SelectionSet, obj *Test) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, testImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, testImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2398,19 +2470,19 @@ func (ec *executionContext) _Test(ctx context.Context, sel ast.SelectionSet, obj
 		case "id":
 			out.Values[i] = ec._Test_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "test":
 			out.Values[i] = ec._Test_test(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2419,10 +2491,10 @@ func (ec *executionContext) _Test(ctx context.Context, sel ast.SelectionSet, obj
 var __DirectiveImplementors = []string{"__Directive"}
 
 func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionSet, obj *introspection.Directive) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, __DirectiveImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, __DirectiveImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2430,26 +2502,26 @@ func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionS
 		case "name":
 			out.Values[i] = ec.___Directive_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "description":
 			out.Values[i] = ec.___Directive_description(ctx, field, obj)
 		case "locations":
 			out.Values[i] = ec.___Directive_locations(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "args":
 			out.Values[i] = ec.___Directive_args(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2458,10 +2530,10 @@ func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionS
 var __EnumValueImplementors = []string{"__EnumValue"}
 
 func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.EnumValue) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, __EnumValueImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, __EnumValueImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2469,14 +2541,14 @@ func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionS
 		case "name":
 			out.Values[i] = ec.___EnumValue_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "description":
 			out.Values[i] = ec.___EnumValue_description(ctx, field, obj)
 		case "isDeprecated":
 			out.Values[i] = ec.___EnumValue_isDeprecated(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "deprecationReason":
 			out.Values[i] = ec.___EnumValue_deprecationReason(ctx, field, obj)
@@ -2485,7 +2557,7 @@ func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionS
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2494,10 +2566,10 @@ func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionS
 var __FieldImplementors = []string{"__Field"}
 
 func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, obj *introspection.Field) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, __FieldImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, __FieldImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2505,24 +2577,24 @@ func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, 
 		case "name":
 			out.Values[i] = ec.___Field_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "description":
 			out.Values[i] = ec.___Field_description(ctx, field, obj)
 		case "args":
 			out.Values[i] = ec.___Field_args(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "type":
 			out.Values[i] = ec.___Field_type(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "isDeprecated":
 			out.Values[i] = ec.___Field_isDeprecated(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "deprecationReason":
 			out.Values[i] = ec.___Field_deprecationReason(ctx, field, obj)
@@ -2531,7 +2603,7 @@ func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, 
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2540,10 +2612,10 @@ func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, 
 var __InputValueImplementors = []string{"__InputValue"}
 
 func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.InputValue) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, __InputValueImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, __InputValueImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2551,14 +2623,14 @@ func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.Selection
 		case "name":
 			out.Values[i] = ec.___InputValue_name(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "description":
 			out.Values[i] = ec.___InputValue_description(ctx, field, obj)
 		case "type":
 			out.Values[i] = ec.___InputValue_type(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "defaultValue":
 			out.Values[i] = ec.___InputValue_defaultValue(ctx, field, obj)
@@ -2567,7 +2639,7 @@ func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.Selection
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2576,10 +2648,10 @@ func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.Selection
 var __SchemaImplementors = []string{"__Schema"}
 
 func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet, obj *introspection.Schema) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, __SchemaImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, __SchemaImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2587,12 +2659,12 @@ func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet,
 		case "types":
 			out.Values[i] = ec.___Schema_types(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "queryType":
 			out.Values[i] = ec.___Schema_queryType(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "mutationType":
 			out.Values[i] = ec.___Schema_mutationType(ctx, field, obj)
@@ -2601,14 +2673,14 @@ func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet,
 		case "directives":
 			out.Values[i] = ec.___Schema_directives(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2617,10 +2689,10 @@ func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet,
 var __TypeImplementors = []string{"__Type"}
 
 func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, obj *introspection.Type) graphql.Marshaler {
-	fields := graphql.CollectFields(ctx, sel, __TypeImplementors)
+	fields := graphql.CollectFields(ec.RequestContext, sel, __TypeImplementors)
 
 	out := graphql.NewFieldSet(fields)
-	invalid := false
+	var invalids uint32
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
@@ -2628,7 +2700,7 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 		case "kind":
 			out.Values[i] = ec.___Type_kind(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
-				invalid = true
+				invalids++
 			}
 		case "name":
 			out.Values[i] = ec.___Type_name(ctx, field, obj)
@@ -2651,7 +2723,7 @@ func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, o
 		}
 	}
 	out.Dispatch()
-	if invalid {
+	if invalids > 0 {
 		return graphql.Null
 	}
 	return out
@@ -2666,11 +2738,27 @@ func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v interf
 }
 
 func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.SelectionSet, v bool) graphql.Marshaler {
-	return graphql.MarshalBoolean(v)
+	res := graphql.MarshalBoolean(v)
+	if res == graphql.Null {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) marshalNCustomer2dataloaderᚐCustomer(ctx context.Context, sel ast.SelectionSet, v Customer) graphql.Marshaler {
 	return ec._Customer(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNCustomer2ᚖdataloaderᚐCustomer(ctx context.Context, sel ast.SelectionSet, v *Customer) graphql.Marshaler {
+	if v == nil {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Customer(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNID2int(ctx context.Context, v interface{}) (int, error) {
@@ -2678,7 +2766,13 @@ func (ec *executionContext) unmarshalNID2int(ctx context.Context, v interface{})
 }
 
 func (ec *executionContext) marshalNID2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
-	return graphql.MarshalIntID(v)
+	res := graphql.MarshalIntID(v)
+	if res == graphql.Null {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface{}) (string, error) {
@@ -2686,7 +2780,13 @@ func (ec *executionContext) unmarshalNID2string(ctx context.Context, v interface
 }
 
 func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
-	return graphql.MarshalID(v)
+	res := graphql.MarshalID(v)
+	if res == graphql.Null {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}) (int, error) {
@@ -2694,19 +2794,55 @@ func (ec *executionContext) unmarshalNInt2int(ctx context.Context, v interface{}
 }
 
 func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.SelectionSet, v int) graphql.Marshaler {
-	return graphql.MarshalInt(v)
+	res := graphql.MarshalInt(v)
+	if res == graphql.Null {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) marshalNOrder2dataloaderᚐOrder(ctx context.Context, sel ast.SelectionSet, v Order) graphql.Marshaler {
 	return ec._Order(ctx, sel, &v)
 }
 
+func (ec *executionContext) marshalNOrder2ᚖdataloaderᚐOrder(ctx context.Context, sel ast.SelectionSet, v *Order) graphql.Marshaler {
+	if v == nil {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Order(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNPageInfo2dataloaderᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v PageInfo) graphql.Marshaler {
 	return ec._PageInfo(ctx, sel, &v)
 }
 
+func (ec *executionContext) marshalNPageInfo2ᚖdataloaderᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v *PageInfo) graphql.Marshaler {
+	if v == nil {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._PageInfo(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalNProject2dataloaderᚐProject(ctx context.Context, sel ast.SelectionSet, v Project) graphql.Marshaler {
 	return ec._Project(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNProject2ᚖdataloaderᚐProject(ctx context.Context, sel ast.SelectionSet, v *Project) graphql.Marshaler {
+	if v == nil {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Project(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
@@ -2714,7 +2850,13 @@ func (ec *executionContext) unmarshalNString2string(ctx context.Context, v inter
 }
 
 func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
-	return graphql.MarshalString(v)
+	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
@@ -2722,13 +2864,13 @@ func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v in
 }
 
 func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
-	if v.IsZero() {
+	res := graphql.MarshalTime(v)
+	if res == graphql.Null {
 		if !ec.HasError(graphql.GetResolverContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
 		}
-		return graphql.Null
 	}
-	return graphql.MarshalTime(v)
+	return res
 }
 
 func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler {
@@ -2777,7 +2919,13 @@ func (ec *executionContext) unmarshalN__DirectiveLocation2string(ctx context.Con
 }
 
 func (ec *executionContext) marshalN__DirectiveLocation2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
-	return graphql.MarshalString(v)
+	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalN__DirectiveLocation2ᚕstring(ctx context.Context, v interface{}) ([]string, error) {
@@ -2942,7 +3090,13 @@ func (ec *executionContext) unmarshalN__TypeKind2string(ctx context.Context, v i
 }
 
 func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
-	return graphql.MarshalString(v)
+	res := graphql.MarshalString(v)
+	if res == graphql.Null {
+		if !ec.HasError(graphql.GetResolverContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+	}
+	return res
 }
 
 func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v interface{}) (bool, error) {
@@ -2968,7 +3122,7 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return ec.marshalOBoolean2bool(ctx, sel, *v)
 }
 
-func (ec *executionContext) marshalOCustomer2ᚕdataloaderᚐCustomer(ctx context.Context, sel ast.SelectionSet, v []Customer) graphql.Marshaler {
+func (ec *executionContext) marshalOCustomer2ᚕᚖdataloaderᚐCustomer(ctx context.Context, sel ast.SelectionSet, v []*Customer) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -2995,7 +3149,7 @@ func (ec *executionContext) marshalOCustomer2ᚕdataloaderᚐCustomer(ctx contex
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNCustomer2dataloaderᚐCustomer(ctx, sel, v[i])
+			ret[i] = ec.marshalNCustomer2ᚖdataloaderᚐCustomer(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3031,11 +3185,15 @@ func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.Sele
 	return ec.marshalOInt2int(ctx, sel, *v)
 }
 
+func (ec *executionContext) marshalONode2dataloaderᚐNode(ctx context.Context, sel ast.SelectionSet, v Node) graphql.Marshaler {
+	return ec._Node(ctx, sel, &v)
+}
+
 func (ec *executionContext) marshalOOrder2dataloaderᚐOrder(ctx context.Context, sel ast.SelectionSet, v Order) graphql.Marshaler {
 	return ec._Order(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalOOrder2ᚕdataloaderᚐOrder(ctx context.Context, sel ast.SelectionSet, v []Order) graphql.Marshaler {
+func (ec *executionContext) marshalOOrder2ᚕᚖdataloaderᚐOrder(ctx context.Context, sel ast.SelectionSet, v []*Order) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -3062,7 +3220,7 @@ func (ec *executionContext) marshalOOrder2ᚕdataloaderᚐOrder(ctx context.Cont
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNOrder2dataloaderᚐOrder(ctx, sel, v[i])
+			ret[i] = ec.marshalNOrder2ᚖdataloaderᚐOrder(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3144,7 +3302,7 @@ func (ec *executionContext) marshalOOrderEdge2ᚖdataloaderᚐOrderEdge(ctx cont
 	return ec._OrderEdge(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOProject2ᚕdataloaderᚐProject(ctx context.Context, sel ast.SelectionSet, v []Project) graphql.Marshaler {
+func (ec *executionContext) marshalOProject2ᚕᚖdataloaderᚐProject(ctx context.Context, sel ast.SelectionSet, v []*Project) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -3171,7 +3329,7 @@ func (ec *executionContext) marshalOProject2ᚕdataloaderᚐProject(ctx context.
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNProject2dataloaderᚐProject(ctx, sel, v[i])
+			ret[i] = ec.marshalNProject2ᚖdataloaderᚐProject(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)

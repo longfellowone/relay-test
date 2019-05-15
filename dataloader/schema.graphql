@@ -10,6 +10,7 @@ type Test implements Node {
 type Query {
     customers: [Customer!]
     projects: [Project!]
+    node(id: ID!): Node
 }
 
 type Project implements Node{

@@ -1,7 +1,7 @@
-//go:generate go run github.com/vektah/dataloaden -keys int dataloader.Address
-//go:generate go run github.com/vektah/dataloaden -keys int -slice dataloader.Order
-//go:generate go run github.com/vektah/dataloaden -keys int dataloader.OrderConnection
-//go:generate go run github.com/vektah/dataloaden -keys int -slice dataloader.Item
+////go:generate go run github.com/vektah/dataloaden -keys int dataloader.Address
+////go:generate go run github.com/vektah/dataloaden -keys int -slice dataloader.Item
+//go:generate go run github.com/vektah/dataloaden OrderSliceLoader int []*dataloader.Order
+//go:generate go run github.com/vektah/dataloaden OrderConnectionLoader int *dataloader.OrderConnection
 
 // https://medium.freecodecamp.org/deep-dive-into-graphql-with-golang-d3e02a429ac3
 
@@ -38,7 +38,7 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 		ldrs.ordersByCustomer = &OrderSliceLoader{
 			wait:     wait,
 			maxBatch: 100,
-			fetch: func(keys []int) ([][]Order, []error) {
+			fetch: func(keys []int) ([][]*Order, []error) {
 				var keySql []string
 				for _, key := range keys {
 					keySql = append(keySql, strconv.Itoa(key))
@@ -47,11 +47,11 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 				fmt.Printf("SELECT * FROM orders WHERE customer_id IN (%s)\n", strings.Join(keySql, ","))
 				time.Sleep(5 * time.Millisecond)
 
-				orders := make([][]Order, len(keys))
+				orders := make([][]*Order, len(keys))
 				errors := make([]error, len(keys))
 				for i, key := range keys {
 					id := 10 + rand.Int()%3
-					orders[i] = []Order{
+					orders[i] = []*Order{
 						{ID: id, Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(key) * time.Hour)},
 						{ID: id + 1, Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(key) * time.Hour)},
 					}
@@ -87,7 +87,7 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 						{Node: &Order{ID: key, Date: time.Now()}, Cursor: "testing"},
 					}
 
-					orderConnections[i] = &OrderConnection{Edges: edges, PageInfo: PageInfo{HasPreviousPage: true}}
+					orderConnections[i] = &OrderConnection{Edges: edges, PageInfo: &PageInfo{HasPreviousPage: true}}
 				}
 				return orderConnections, errors
 			},

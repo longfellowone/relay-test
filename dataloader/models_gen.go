@@ -17,7 +17,7 @@ type Item struct {
 }
 
 type OrderConnection struct {
-	PageInfo PageInfo     `json:"pageInfo"`
+	PageInfo *PageInfo    `json:"pageInfo"`
 	Edges    []*OrderEdge `json:"edges"`
 }
 
