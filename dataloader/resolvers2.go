@@ -13,53 +13,38 @@ import (
 )
 
 type Project struct {
-	ID   int    `json:"id"`
+	ID   string `json:"id"`
 	Name string `json:"name"`
 }
 
 func (Project) IsNode() {}
 
-type Customer struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	AddressID int
-}
-
 type Order struct {
-	ID     int       `json:"id"`
+	ID     string    `json:"id"`
 	Date   time.Time `json:"date"`
 	Amount float64   `json:"amount"`
 }
+
+func (Order) IsNode() {}
+
+//SELECT * FROM customers
+//SELECT * FROM address WHERE id IN (4,3,1)
+//SELECT * FROM orders WHERE customer_id IN (2,1,3)
 
 type Resolver struct{}
 
 func (r *Resolver) Query() QueryResolver {
 	return &queryResolver{r}
 }
-
-func (r *Resolver) Customer() CustomerResolver {
-	return &customerResolver{r}
-}
-
 func (r *Resolver) Project() ProjectResolver {
 	return &projectResolver{r}
 }
 
 type queryResolver struct{ *Resolver }
 
-//SELECT * FROM customers
-//SELECT * FROM address WHERE id IN (4,3,1)
-//SELECT * FROM orders WHERE customer_id IN (2,1,3)
-
-func (r *queryResolver) Customers(ctx context.Context) ([]*Customer, error) {
-	fmt.Println("SELECT * FROM customers")
-	//time.Sleep(5 * time.Millisecond)
-
-	return []*Customer{
-		{ID: 1, Name: "Bob", AddressID: 1},
-		{ID: 2, Name: "Alice", AddressID: 3},
-		{ID: 3, Name: "Eve", AddressID: 4},
-	}, nil
+func (r *queryResolver) Node(ctx context.Context, id string) (Node, error) {
+	// Direct DB call
+	return Project{ID: "99", Name: ""}, nil
 }
 
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
@@ -68,17 +53,12 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	time.Sleep(5 * time.Millisecond)
 
 	return []*Project{
-		{ID: 3, Name: "Project Name 3"},
-		{ID: 5, Name: "Project Name 5"},
-		{ID: 7, Name: "Project Name 7"},
-		{ID: 2, Name: "Project Name 2"},
-		{ID: 19, Name: "Project Name 19"},
+		{ID: "3", Name: "Project Name 3"},
+		{ID: "5", Name: "Project Name 5"},
+		{ID: "7", Name: "Project Name 7"},
+		{ID: "2", Name: "Project Name 2"},
+		{ID: "19", Name: "Project Name 19"},
 	}, nil
-}
-
-func (r *queryResolver) Node(ctx context.Context, id string) (Node, error) {
-	// Direct DB call
-	return Project{ID: 99, Name: ""}, nil
 }
 
 type projectResolver struct{ *Resolver }
@@ -87,11 +67,28 @@ func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *strin
 	return ctxLoaders(ctx).ordersByProject.Load(obj.ID)
 }
 
-type customerResolver struct{ *Resolver }
+//type Customer struct {
+//	ID        int    `json:"id"`
+//	Name      string `json:"name"`
+//	AddressID int
+//}
 
-func (r *customerResolver) Orders(ctx context.Context, obj *Customer) ([]*Order, error) {
-	return ctxLoaders(ctx).ordersByCustomer.Load(obj.ID)
-}
+//func (r *queryResolver) Customers(ctx context.Context) ([]*Customer, error) {
+//	fmt.Println("SELECT * FROM customers")
+//	//time.Sleep(5 * time.Millisecond)
+//
+//	return []*Customer{
+//		{ID: 1, Name: "Bob", AddressID: 1},
+//		{ID: 2, Name: "Alice", AddressID: 3},
+//		{ID: 3, Name: "Eve", AddressID: 4},
+//	}, nil
+//}
+
+//type customerResolver struct{ *Resolver }
+//
+//func (r *customerResolver) Orders(ctx context.Context, obj *Customer) ([]*Order, error) {
+//	return ctxLoaders(ctx).ordersByCustomer.Load(obj.ID)
+//}
 
 //func (r *Resolver) Order() OrderResolver {
 //	return &orderResolver{r}

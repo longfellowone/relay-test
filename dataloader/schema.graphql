@@ -8,7 +8,7 @@ type Test implements Node {
 }
 
 type Query {
-    customers: [Customer!]
+#    customers: [Customer!]
     projects: [Project!]
     node(id: ID!): Node
 }
@@ -36,12 +36,12 @@ type PageInfo {
     endCursor: String
 }
 
-type Customer {
-    id: Int!
-    name: String!
-#    address: Address
-    orders: [Order!]
-}
+#type Customer {
+#    id: Int!
+#    name: String!
+##    address: Address
+#    orders: [Order!]
+#}
 
 type Address {
     id: Int!
@@ -49,8 +49,8 @@ type Address {
     country: String!
 }
 
-type Order {
-    id: Int!
+type Order implements Node {
+    id: ID!
     date: Time!
 #    items: [Item!]
 }

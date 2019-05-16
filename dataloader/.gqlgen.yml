@@ -6,8 +6,7 @@ resolver:
 models:
   Order:
     model: dataloader.Order
-  Customer:
-    model: dataloader.Customer
   Project:
     model: dataloader.Project
-
+#  Customer:
+#    model: dataloader.Customer

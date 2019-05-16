@@ -1,7 +1,7 @@
 ////go:generate go run github.com/vektah/dataloaden -keys int dataloader.Address
 ////go:generate go run github.com/vektah/dataloaden -keys int -slice dataloader.Item
-//go:generate go run github.com/vektah/dataloaden OrderSliceLoader int []*dataloader.Order
-//go:generate go run github.com/vektah/dataloaden OrderConnectionLoader int *dataloader.OrderConnection
+//go:generate go run github.com/vektah/dataloaden OrderSliceLoader string []*dataloader.Order
+//go:generate go run github.com/vektah/dataloaden OrderConnectionLoader string *dataloader.OrderConnection
 
 // https://medium.freecodecamp.org/deep-dive-into-graphql-with-golang-d3e02a429ac3
 
@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -38,22 +37,16 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 		ldrs.ordersByCustomer = &OrderSliceLoader{
 			wait:     wait,
 			maxBatch: 100,
-			fetch: func(keys []int) ([][]*Order, []error) {
-				var keySql []string
-				for _, key := range keys {
-					keySql = append(keySql, strconv.Itoa(key))
-				}
-
-				fmt.Printf("SELECT * FROM orders WHERE customer_id IN (%s)\n", strings.Join(keySql, ","))
+			fetch: func(keys []string) ([][]*Order, []error) {
+				fmt.Printf("SELECT * FROM orders WHERE customer_id IN (%s)\n", strings.Join(keys, ","))
 				time.Sleep(5 * time.Millisecond)
 
 				orders := make([][]*Order, len(keys))
 				errors := make([]error, len(keys))
-				for i, key := range keys {
-					id := 10 + rand.Int()%3
+				for i := range keys {
 					orders[i] = []*Order{
-						{ID: id, Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(key) * time.Hour)},
-						{ID: id + 1, Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(key) * time.Hour)},
+						{ID: "orderid1", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
+						{ID: "orderid2", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
 					}
 
 					// if you had another customer loader you would prime its cache here
@@ -68,13 +61,8 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 		ldrs.ordersByProject = &OrderConnectionLoader{
 			wait:     wait,
 			maxBatch: 100,
-			fetch: func(keys []int) ([]*OrderConnection, []error) {
-				var keySql []string
-				for _, key := range keys {
-					keySql = append(keySql, strconv.Itoa(key))
-				}
-
-				fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keySql, ","))
+			fetch: func(keys []string) ([]*OrderConnection, []error) {
+				fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keys, ","))
 				time.Sleep(5 * time.Millisecond)
 
 				// make edge array

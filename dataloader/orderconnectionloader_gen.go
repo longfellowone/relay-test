@@ -10,7 +10,7 @@ import (
 // OrderConnectionLoaderConfig captures the config to create a new OrderConnectionLoader
 type OrderConnectionLoaderConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []int) ([]*OrderConnection, []error)
+	Fetch func(keys []string) ([]*OrderConnection, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -31,7 +31,7 @@ func NewOrderConnectionLoader(config OrderConnectionLoaderConfig) *OrderConnecti
 // OrderConnectionLoader batches and caches requests
 type OrderConnectionLoader struct {
 	// this method provides the data for the loader
-	fetch func(keys []int) ([]*OrderConnection, []error)
+	fetch func(keys []string) ([]*OrderConnection, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -42,7 +42,7 @@ type OrderConnectionLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[int]*OrderConnection
+	cache map[string]*OrderConnection
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
@@ -53,7 +53,7 @@ type OrderConnectionLoader struct {
 }
 
 type orderConnectionLoaderBatch struct {
-	keys    []int
+	keys    []string
 	data    []*OrderConnection
 	error   []error
 	closing bool
@@ -61,14 +61,14 @@ type orderConnectionLoaderBatch struct {
 }
 
 // Load a OrderConnection by key, batching and caching will be applied automatically
-func (l *OrderConnectionLoader) Load(key int) (*OrderConnection, error) {
+func (l *OrderConnectionLoader) Load(key string) (*OrderConnection, error) {
 	return l.LoadThunk(key)()
 }
 
 // LoadThunk returns a function that when called will block waiting for a OrderConnection.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *OrderConnectionLoader) LoadThunk(key int) func() (*OrderConnection, error) {
+func (l *OrderConnectionLoader) LoadThunk(key string) func() (*OrderConnection, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
@@ -111,7 +111,7 @@ func (l *OrderConnectionLoader) LoadThunk(key int) func() (*OrderConnection, err
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *OrderConnectionLoader) LoadAll(keys []int) ([]*OrderConnection, []error) {
+func (l *OrderConnectionLoader) LoadAll(keys []string) ([]*OrderConnection, []error) {
 	results := make([]func() (*OrderConnection, error), len(keys))
 
 	for i, key := range keys {
@@ -129,7 +129,7 @@ func (l *OrderConnectionLoader) LoadAll(keys []int) ([]*OrderConnection, []error
 // LoadAllThunk returns a function that when called will block waiting for a OrderConnections.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *OrderConnectionLoader) LoadAllThunk(keys []int) func() ([]*OrderConnection, []error) {
+func (l *OrderConnectionLoader) LoadAllThunk(keys []string) func() ([]*OrderConnection, []error) {
 	results := make([]func() (*OrderConnection, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
@@ -147,7 +147,7 @@ func (l *OrderConnectionLoader) LoadAllThunk(keys []int) func() ([]*OrderConnect
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *OrderConnectionLoader) Prime(key int, value *OrderConnection) bool {
+func (l *OrderConnectionLoader) Prime(key string, value *OrderConnection) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
@@ -161,22 +161,22 @@ func (l *OrderConnectionLoader) Prime(key int, value *OrderConnection) bool {
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *OrderConnectionLoader) Clear(key int) {
+func (l *OrderConnectionLoader) Clear(key string) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *OrderConnectionLoader) unsafeSet(key int, value *OrderConnection) {
+func (l *OrderConnectionLoader) unsafeSet(key string, value *OrderConnection) {
 	if l.cache == nil {
-		l.cache = map[int]*OrderConnection{}
+		l.cache = map[string]*OrderConnection{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *orderConnectionLoaderBatch) keyIndex(l *OrderConnectionLoader, key int) int {
+func (b *orderConnectionLoaderBatch) keyIndex(l *OrderConnectionLoader, key string) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
