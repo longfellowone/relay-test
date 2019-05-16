@@ -11,6 +11,8 @@ import (
 
 func main() {
 	router := chi.NewRouter()
+
+	// Inject DB here?
 	router.Use(dataloader.LoaderMiddleware)
 
 	router.Handle("/", handler.Playground("Dataloader", "/query"))

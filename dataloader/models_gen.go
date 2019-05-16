@@ -6,16 +6,6 @@ type Node interface {
 	IsNode()
 }
 
-type Address struct {
-	ID      int    `json:"id"`
-	Street  string `json:"street"`
-	Country string `json:"country"`
-}
-
-type Item struct {
-	Name string `json:"name"`
-}
-
 type OrderConnection struct {
 	PageInfo *PageInfo    `json:"pageInfo"`
 	Edges    []*OrderEdge `json:"edges"`
@@ -32,10 +22,3 @@ type PageInfo struct {
 	StartCursor     *string `json:"startCursor"`
 	EndCursor       *string `json:"endCursor"`
 }
-
-type Test struct {
-	ID   string `json:"id"`
-	Test string `json:"test"`
-}
-
-func (Test) IsNode() {}

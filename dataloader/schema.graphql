@@ -1,16 +1,9 @@
+type Query {
+    projects: [Project!]
+}
+
 interface Node {
     id: ID!
-}
-
-type Test implements Node {
-    id: ID!
-    test: String!
-}
-
-type Query {
-#    customers: [Customer!]
-    projects: [Project!]
-    node(id: ID!): Node
 }
 
 type Project implements Node{
@@ -29,34 +22,16 @@ type OrderEdge {
     cursor: String!
 }
 
+type Order implements Node {
+    id: ID!
+    date: Time!
+}
+
 type PageInfo {
     hasNextPage: Boolean!
     hasPreviousPage: Boolean!
     startCursor: String
     endCursor: String
-}
-
-#type Customer {
-#    id: Int!
-#    name: String!
-##    address: Address
-#    orders: [Order!]
-#}
-
-type Address {
-    id: Int!
-    street: String!
-    country: String!
-}
-
-type Order implements Node {
-    id: ID!
-    date: Time!
-#    items: [Item!]
-}
-
-type Item {
-    name: String!
 }
 
 scalar Time
