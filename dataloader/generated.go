@@ -1966,6 +1966,8 @@ func (ec *executionContext) _Node(ctx context.Context, sel ast.SelectionSet, obj
 		return ec._Project(ctx, sel, &obj)
 	case *Project:
 		return ec._Project(ctx, sel, obj)
+	case Order:
+		return ec._Order(ctx, sel, &obj)
 	case *Order:
 		return ec._Order(ctx, sel, obj)
 	default:

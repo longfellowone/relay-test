@@ -43,11 +43,12 @@ func (r *Resolver) Project() ProjectResolver {
 type queryResolver struct{ *Resolver }
 
 func (r *queryResolver) Node(ctx context.Context, id string) (Node, error) {
-	// Direct DB call
+	// Direct DB call use methods to verify user
 	return Project{ID: "99", Name: ""}, nil
 }
 
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
+	// If user has scope manage:orders pull by user orginization id, else pull by user id
 	fmt.Println("SELECT * FROM projects")
 
 	time.Sleep(5 * time.Millisecond)

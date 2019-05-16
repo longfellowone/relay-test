@@ -1,6 +1,6 @@
 ////go:generate go run github.com/vektah/dataloaden -keys int dataloader.Address
 ////go:generate go run github.com/vektah/dataloaden -keys int -slice dataloader.Item
-//go:generate go run github.com/vektah/dataloaden OrderSliceLoader string []*dataloader.Order
+////go:generate go run github.com/vektah/dataloaden OrderSliceLoader string []*dataloader.Order
 //go:generate go run github.com/vektah/dataloaden OrderConnectionLoader string *dataloader.OrderConnection
 
 // https://medium.freecodecamp.org/deep-dive-into-graphql-with-golang-d3e02a429ac3
@@ -10,7 +10,6 @@ package dataloader
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -21,8 +20,8 @@ type ctxKeyType struct{ name string }
 var ctxKey = ctxKeyType{"userCtx"}
 
 type loaders struct {
-	ordersByCustomer *OrderSliceLoader
-	ordersByProject  *OrderConnectionLoader
+	ordersByProject *OrderConnectionLoader
+	//ordersByCustomer *OrderSliceLoader
 	//addressByID      *AddressLoader
 	//itemsByOrder     *ItemSliceLoader
 }
@@ -32,30 +31,6 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 		ldrs := loaders{}
 
 		wait := 250 * time.Microsecond
-
-		// 1:M loader
-		ldrs.ordersByCustomer = &OrderSliceLoader{
-			wait:     wait,
-			maxBatch: 100,
-			fetch: func(keys []string) ([][]*Order, []error) {
-				fmt.Printf("SELECT * FROM orders WHERE customer_id IN (%s)\n", strings.Join(keys, ","))
-				time.Sleep(5 * time.Millisecond)
-
-				orders := make([][]*Order, len(keys))
-				errors := make([]error, len(keys))
-				for i := range keys {
-					orders[i] = []*Order{
-						{ID: "orderid1", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
-						{ID: "orderid2", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
-					}
-
-					// if you had another customer loader you would prime its cache here
-					// by calling `ldrs.ordersByID.Prime(id, orders[i])`
-				}
-
-				return orders, errors
-			},
-		}
 
 		// 1:1 loader
 		ldrs.ordersByProject = &OrderConnectionLoader{
@@ -80,6 +55,31 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 				return orderConnections, errors
 			},
 		}
+
+		// 1:M loader
+		//ldrs.ordersByCustomer = &OrderSliceLoader{
+		//	wait:     wait,
+		//	maxBatch: 100,
+		//	fetch: func(keys []string) ([][]*Order, []error) {
+		//		// If user has scope manage:orders pull by user orginization id, else pull by user id
+		//		fmt.Printf("SELECT * FROM orders WHERE customer_id IN (%s)\n", strings.Join(keys, ","))
+		//		time.Sleep(5 * time.Millisecond)
+		//
+		//		orders := make([][]*Order, len(keys))
+		//		errors := make([]error, len(keys))
+		//		for i := range keys {
+		//			orders[i] = []*Order{
+		//				{ID: "orderid1", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
+		//				{ID: "orderid2", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
+		//			}
+		//
+		//			// if you had another customer loader you would prime its cache here
+		//			// by calling `ldrs.ordersByID.Prime(id, orders[i])`
+		//		}
+		//
+		//		return orders, errors
+		//	},
+		//}
 
 		// simple 1:1 loader, fetch an address by its primary key
 		//ldrs.addressByID = &AddressLoader{
