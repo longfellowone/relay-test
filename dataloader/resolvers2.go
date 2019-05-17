@@ -9,8 +9,11 @@ import (
 )
 
 type Project struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	OrderID   string `json:"order_ids"`
+	Comments  string
+	ProjectID string
 }
 
 func (Project) IsNode() {}
@@ -34,48 +37,152 @@ type Resolver struct {
 func (r *Resolver) Query() QueryResolver {
 	return &queryResolver{r}
 }
+
+//func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+//	// Newest to oldest 120, 110, 100, 90, 80, 70
+//
+//	// If the after argument is provided, add id > parsed_cursor to the WHERE clause
+//	var orders []Order
+//	err := r.DB.Select(&orders, "SELECT * FROM orders WHERE sentdate < 110 order by sentdate DESC LIMIT 2")
+//	if err != nil {
+//		fmt.Println(err)
+//	}
+//
+//	for _, o := range orders {
+//
+//		fmt.Println(o.ID)
+//	}
+//
+//	//return ctxLoaders(ctx).ordersByProject.Load(obj.ID)
+//	return &OrderConnection{}, nil
+//}
+
 func (r *Resolver) Project() ProjectResolver {
 	return &projectResolver{r}
 }
 
 type queryResolver struct{ *Resolver }
 
-func (r *queryResolver) Project(ctx context.Context, id string) (*Project, error) {
-	fmt.Println("SELECT * FROM project WHERE id = id")
+func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
+	const query = `
+		SELECT 
+		id, name
+		FROM projects
+		LEFT JOIN orders on orders.projectid = id
+-- 		WHERE projectid = $1
+-- 		WHERE projectid IN ($1)
+	`
 
-	return &Project{ID: "cf510766-faf7-415e-a067-0c5ae5cb2ae8", Name: "Project Name 3"}, nil
-}
-
-type projectResolver struct{ *Resolver }
-
-func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
-	// Fetch first 10 timestamps for a project
-	// pass array of timestamps in connection to edges
-	// Edges resolveOrdersByProject, pass in array of timestamps
-	// SELECT * FROM orders where timestamp IN -----
-	// array of project order IDs
-
-	var orders []Order
-	err := r.DB.Select(&orders, "SELECT sentdate FROM orders WHERE projectid=$1 order by sentdate ASC", obj.ID)
+	var projects []Project
+	err := r.DB.Select(&projects, query)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	for _, o := range orders {
-		fmt.Println(o.SentDate)
+	for _, p := range projects {
+		//fmt.Println(p.ID, p.Name, p.OrderID)
+		fmt.Println(p)
 	}
 
-	// 	fmt.Println("SELECT timestamp FROM orders WHERE project_id = obj.id LIMIT first")
-	//return &OrderConnection{
-	//	PageInfo: &PageInfo{
-	//		HasNextPage:     false,
-	//		HasPreviousPage: false,
-	//		StartCursor:     nil,
-	//		EndCursor:       nil,
-	//	},
-	//	Edges: nil,
-	//}, nil
+	return []*Project{{ID: "projectID01"}, {ID: "projectID02"}}, nil
+}
+
+//func (r *queryResolver) Projects(ctx context.Context, id string) (*ProjectConnection, error) {
+//	const query = `
+//		SELECT
+//		orderid, projectid
+//		FROM orders
+//		LEFT JOIN projects on orders.projectid = id
+//		WHERE projectid IN ($1,$2)
+//	`
+//
+//	var projects []Project
+//	err := r.DB.Select(&projects, query, id, "")
+//	if err != nil {
+//		fmt.Println(err)
+//	}
+//
+//	for _, p := range projects {
+//		//fmt.Println(p.ID, p.Name, p.OrderID)
+//		fmt.Println(p.OrderID)
+//	}
+//
+//	// No duplicate orders so join orders_id's on project
+//
+//	// Use load projects WHERE in orgID (From context)
+//	//fmt.Println("SELECT * FROM project WHERE id = id")
+//
+//	// loader loaderOrderIds from project id
+//	// Pass add order IDs to project struct
+//
+//	return &ProjectConnection{}, nil
+//}
+
+type projectResolver struct{ *Resolver }
+
+func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+
+	fmt.Println(obj)
+
+	//	const query = `
+	//		SELECT
+	//		id, name
+	//		FROM projects
+	//		LEFT JOIN orders on orders.projectid = id
+	//		WHERE projectid = $1
+	//-- 		WHERE projectid IN ($1)
+	//	`
+	//
+	//	var projects []Project
+	//	err := r.DB.Select(&projects, query, obj.ID)
+	//	if err != nil {
+	//		fmt.Println(err)
+	//	}
+	//
+	//	for _, p := range projects {
+	//		//fmt.Println(p.ID, p.Name, p.OrderID)
+	//		fmt.Println(p)
+	//	}
+
+	//fmt.Println(obj.OrderID)
+
+	// Newest to oldest 120, 110, 100, 90, 80, 70
+
+	// If the after argument is provided, add id > parsed_cursor to the WHERE clause
+	//var orders []Order
+	//err := r.DB.Select(&orders, "SELECT * FROM orders WHERE projectid=$1 AND sentdate < 110 order by sentdate DESC LIMIT 2", obj.ID)
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+
+	//for _, o := range orders {
+	//	fmt.Println(o.ID)
+	//}
+
+	// load orders by project ID
+	//fmt.Println("Select * FROM orders WHERE projectID in (2,8,12)")
+
 	//return ctxLoaders(ctx).ordersByProject.Load(obj.ID)
-	// Dont even use data loader?
 	return &OrderConnection{}, nil
 }
+
+// Prime project to order loader
+//const resolvers = {
+//Query: {
+//users: async (root, args, { userLoader }) => {
+//// Our loader can't get all users, so let's use the model directly here
+//const allUsers = await User.find({})
+//// then tell the loader about the users we found
+//for (const user of allUsers) {
+//userLoader.prime(user.id, user);
+//}
+//// and finally return the result
+//return allUsers
+//}
+//},
+//User: {
+//friends: async (user, args, { userLoader }) => {
+//return userLoader.loadMany(user.friendIds)
+//},
+//},
+//}

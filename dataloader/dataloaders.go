@@ -1,4 +1,5 @@
 //go:generate go run github.com/vektah/dataloaden OrderConnectionLoader string *dataloader.OrderConnection
+//go:generate go run github.com/vektah/dataloaden ProjectConnectionLoader string *dataloader.ProjectConnection
 
 package dataloader
 

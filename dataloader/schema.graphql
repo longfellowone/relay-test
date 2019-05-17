@@ -1,10 +1,21 @@
+interface Node {
+    id: ID!
+}
+
 type Query {
-    project(id: String!): Project!
+    projects: [Project]
+#    projects(after: String, first: Int, before: String, last: Int): ProjectConnection
 #    orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }
 
-interface Node {
-    id: ID!
+type ProjectConnection {
+    pageInfo: PageInfo!
+    edges: [ProjectEdge]
+}
+
+type ProjectEdge {
+    node: Project
+    cursor: String!
 }
 
 type Project implements Node {
@@ -25,6 +36,7 @@ type OrderEdge {
 
 type Order implements Node {
     id: ID!
+    comments: String!
 #    date: Time!
 }
 

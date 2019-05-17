@@ -22,3 +22,13 @@ type PageInfo struct {
 	StartCursor     *string `json:"startCursor"`
 	EndCursor       *string `json:"endCursor"`
 }
+
+type ProjectConnection struct {
+	PageInfo *PageInfo      `json:"pageInfo"`
+	Edges    []*ProjectEdge `json:"edges"`
+}
+
+type ProjectEdge struct {
+	Node   *Project `json:"node"`
+	Cursor string   `json:"cursor"`
+}

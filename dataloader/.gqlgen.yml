@@ -7,9 +7,3 @@ models:
     model: dataloader.Order
   Project:
     model: dataloader.Project
-#  OrderConnection:
-#    fields:
-#      pageInfo:
-#        resolver: true
-#      edges:
-#        resolver: true
