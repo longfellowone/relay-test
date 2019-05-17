@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
@@ -45,8 +44,7 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	Order struct {
-		Date func(childComplexity int) int
-		ID   func(childComplexity int) int
+		ID func(childComplexity int) int
 	}
 
 	OrderConnection struct {
@@ -73,7 +71,7 @@ type ComplexityRoot struct {
 	}
 
 	Query struct {
-		Projects func(childComplexity int) int
+		Project func(childComplexity int, id string) int
 	}
 }
 
@@ -81,7 +79,7 @@ type ProjectResolver interface {
 	Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error)
 }
 type QueryResolver interface {
-	Projects(ctx context.Context) ([]*Project, error)
+	Project(ctx context.Context, id string) (*Project, error)
 }
 
 type executableSchema struct {
@@ -98,13 +96,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e}
 	_ = ec
 	switch typeName + "." + field {
-
-	case "Order.date":
-		if e.complexity.Order.Date == nil {
-			break
-		}
-
-		return e.complexity.Order.Date(childComplexity), true
 
 	case "Order.id":
 		if e.complexity.Order.ID == nil {
@@ -195,12 +186,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Project.Orders(childComplexity, args["after"].(*string), args["first"].(*int), args["before"].(*string), args["last"].(*int)), true
 
-	case "Query.projects":
-		if e.complexity.Query.Projects == nil {
+	case "Query.project":
+		if e.complexity.Query.Project == nil {
 			break
 		}
 
-		return e.complexity.Query.Projects(childComplexity), true
+		args, err := ec.field_Query_project_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Project(childComplexity, args["id"].(string)), true
 
 	}
 	return 0, false
@@ -267,14 +263,15 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 
 var parsedSchema = gqlparser.MustLoadSchema(
 	&ast.Source{Name: "schema.graphql", Input: `type Query {
-    projects: [Project!]
+    project(id: String!): Project!
+#    orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }
 
 interface Node {
     id: ID!
 }
 
-type Project implements Node{
+type Project implements Node {
     id: ID!
     name: String!
     orders(after: String, first: Int, before: String, last: Int): OrderConnection
@@ -292,7 +289,7 @@ type OrderEdge {
 
 type Order implements Node {
     id: ID!
-    date: Time!
+#    date: Time!
 }
 
 type PageInfo {
@@ -302,7 +299,7 @@ type PageInfo {
     endCursor: String
 }
 
-scalar Time
+#scalar Time
 `},
 )
 
@@ -359,6 +356,20 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 		}
 	}
 	args["name"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_project_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
 	return args, nil
 }
 
@@ -419,33 +430,6 @@ func (ec *executionContext) _Order_id(ctx context.Context, field graphql.Collect
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
 	return ec.marshalNID2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) _Order_date(ctx context.Context, field graphql.CollectedField, obj *Order) graphql.Marshaler {
-	ctx = ec.Tracer.StartFieldExecution(ctx, field)
-	defer func() { ec.Tracer.EndFieldExecution(ctx) }()
-	rctx := &graphql.ResolverContext{
-		Object:   "Order",
-		Field:    field,
-		Args:     nil,
-		IsMethod: false,
-	}
-	ctx = graphql.WithResolverContext(ctx, rctx)
-	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
-	resTmp := ec.FieldMiddleware(ctx, obj, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Date, nil
-	})
-	if resTmp == nil {
-		if !ec.HasError(rctx) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(time.Time)
-	rctx.Result = res
-	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _OrderConnection_pageInfo(ctx context.Context, field graphql.CollectedField, obj *OrderConnection) graphql.Marshaler {
@@ -737,7 +721,7 @@ func (ec *executionContext) _Project_orders(ctx context.Context, field graphql.C
 	return ec.marshalOOrderConnection2ᚖdataloaderᚐOrderConnection(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Query_projects(ctx context.Context, field graphql.CollectedField) graphql.Marshaler {
+func (ec *executionContext) _Query_project(ctx context.Context, field graphql.CollectedField) graphql.Marshaler {
 	ctx = ec.Tracer.StartFieldExecution(ctx, field)
 	defer func() { ec.Tracer.EndFieldExecution(ctx) }()
 	rctx := &graphql.ResolverContext{
@@ -747,18 +731,28 @@ func (ec *executionContext) _Query_projects(ctx context.Context, field graphql.C
 		IsMethod: true,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_project_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	rctx.Args = args
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp := ec.FieldMiddleware(ctx, nil, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Projects(rctx)
+		return ec.resolvers.Query().Project(rctx, args["id"].(string))
 	})
 	if resTmp == nil {
+		if !ec.HasError(rctx) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.([]*Project)
+	res := resTmp.(*Project)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOProject2ᚕᚖdataloaderᚐProject(ctx, field.Selections, res)
+	return ec.marshalNProject2ᚖdataloaderᚐProject(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) graphql.Marshaler {
@@ -1688,11 +1682,6 @@ func (ec *executionContext) _Order(ctx context.Context, sel ast.SelectionSet, ob
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "date":
-			out.Values[i] = ec._Order_date(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -1856,7 +1845,7 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Query")
-		case "projects":
+		case "project":
 			field := field
 			out.Concurrently(i, func() (res graphql.Marshaler) {
 				defer func() {
@@ -1864,7 +1853,10 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_projects(ctx, field)
+				res = ec._Query_project(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
 				return res
 			})
 		case "__type":
@@ -2189,20 +2181,6 @@ func (ec *executionContext) unmarshalNString2string(ctx context.Context, v inter
 
 func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	res := graphql.MarshalString(v)
-	if res == graphql.Null {
-		if !ec.HasError(graphql.GetResolverContext(ctx)) {
-			ec.Errorf(ctx, "must not be null")
-		}
-	}
-	return res
-}
-
-func (ec *executionContext) unmarshalNTime2timeᚐTime(ctx context.Context, v interface{}) (time.Time, error) {
-	return graphql.UnmarshalTime(v)
-}
-
-func (ec *executionContext) marshalNTime2timeᚐTime(ctx context.Context, sel ast.SelectionSet, v time.Time) graphql.Marshaler {
-	res := graphql.MarshalTime(v)
 	if res == graphql.Null {
 		if !ec.HasError(graphql.GetResolverContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -2554,46 +2532,6 @@ func (ec *executionContext) marshalOOrderEdge2ᚖdataloaderᚐOrderEdge(ctx cont
 		return graphql.Null
 	}
 	return ec._OrderEdge(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOProject2ᚕᚖdataloaderᚐProject(ctx context.Context, sel ast.SelectionSet, v []*Project) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		rctx := &graphql.ResolverContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithResolverContext(ctx, rctx)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNProject2ᚖdataloaderᚐProject(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-	return ret
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {

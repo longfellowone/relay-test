@@ -1,12 +1,13 @@
 type Query {
-    projects: [Project!]
+    project(id: String!): Project!
+#    orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }
 
 interface Node {
     id: ID!
 }
 
-type Project implements Node{
+type Project implements Node {
     id: ID!
     name: String!
     orders(after: String, first: Int, before: String, last: Int): OrderConnection
@@ -24,7 +25,7 @@ type OrderEdge {
 
 type Order implements Node {
     id: ID!
-    date: Time!
+#    date: Time!
 }
 
 type PageInfo {
@@ -34,4 +35,4 @@ type PageInfo {
     endCursor: String
 }
 
-scalar Time
+#scalar Time

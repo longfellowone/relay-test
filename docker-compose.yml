@@ -2,22 +2,36 @@ version: '3.7'
 
 services:
 
-  mongo:
-    build:
-      context: .
-      dockerfile: docker/mongo/Dockerfile
+  db:
+    image: postgres
+    restart: always
     env_file: .env
+    volumes:
+      - ./docker/postgres/postgres-init.sql:/docker-entrypoint-initdb.d/postgres-init.sql
+    ports:
+      - "5432:5432"
+  adminer:
+    image: adminer
     restart: always
     ports:
-      - 27017:27017
+      - "8081:8080"
 
-  mongo-express:
-    build:
-      context: .
-      dockerfile: docker/mongo-express/Dockerfile
-    env_file: .env
-    depends_on:
-      - mongo
-    restart: always
-    ports:
-      - 8081:8081
+#  mongo:
+#    build:
+#      context: .
+#      dockerfile: docker/mongo/Dockerfile
+#    env_file: .env
+#    restart: always
+#    ports:
+#      - 27017:27017
+#
+#  mongo-express:
+#    build:
+#      context: .
+#      dockerfile: docker/mongo-express/Dockerfile
+#    env_file: .env
+#    depends_on:
+#      - mongo
+#    restart: always
+#    ports:
+#      - 8081:8081

@@ -36,7 +36,7 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 				for i, key := range keys {
 
 					edges := []*OrderEdge{
-						{Node: &Order{ID: key, Date: time.Now()}, Cursor: "testing"},
+						{Node: &Order{ID: key}, Cursor: "testing"},
 					}
 
 					orderConnections[i] = &OrderConnection{Edges: edges, PageInfo: &PageInfo{HasPreviousPage: true}}

@@ -11,3 +11,5 @@ models:
 #    fields:
 #      pageInfo:
 #        resolver: true
+#      edges:
+#        resolver: true
