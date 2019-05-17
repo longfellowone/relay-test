@@ -6,9 +6,8 @@ package dataloader
 
 import (
 	"context"
-	"fmt"
+	"github.com/jmoiron/sqlx"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -20,7 +19,7 @@ type loaders struct {
 	orderIDsByProject *OrderIDsByProjectLoader
 }
 
-func LoaderMiddleware(next http.Handler) http.Handler {
+func LoaderMiddleware(db *sqlx.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ldrs := loaders{}
 
@@ -30,16 +29,37 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 			wait:     wait,
 			maxBatch: 100,
 			fetch: func(keys []string) ([][]string, []error) {
-				fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keys, ","))
-				time.Sleep(5 * time.Millisecond)
-
-				orderIDs := make([][]string, len(keys))
 				errors := make([]error, len(keys))
-				for i := range keys {
-					orderIDs[i] = []string{"1", "2", "3"}
+
+				query, args, err := sqlx.In("SELECT orderid,projectid FROM orders WHERE orders.projectid IN (?) ORDER by sentdate ASC", keys)
+				query = db.Rebind(query)
+
+				rows, err := db.Query(query, args...)
+				if err != nil {
+					errors = append(errors, err)
 				}
 
-				return orderIDs, errors
+				orderIDs := make(map[string][]string)
+
+				for rows.Next() {
+					var orderid string
+					var projectid string
+
+					if err := rows.Scan(&orderid, &projectid); err != nil {
+						errors = append(errors, err)
+					}
+
+					orderIDs[projectid] = append(orderIDs[projectid], orderid)
+				}
+
+				time.Sleep(5 * time.Millisecond)
+
+				projectOrderIDs := make([][]string, len(keys))
+				for i, v := range keys {
+					projectOrderIDs[i] = orderIDs[v]
+				}
+
+				return projectOrderIDs, errors
 			},
 		}
 

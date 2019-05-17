@@ -20,13 +20,10 @@ func main() {
 
 	router := chi.NewRouter()
 
-	// Inject DB here?
-	router.Use(dataloader.LoaderMiddleware)
-
 	router.Handle("/", handler.Playground("Dataloader", "/query"))
-	router.Handle("/query", handler.GraphQL(
+	router.Handle("/query", dataloader.LoaderMiddleware(db, handler.GraphQL(
 		dataloader.NewExecutableSchema(dataloader.Config{Resolvers: &dataloader.Resolver{DB:db}}),
-	))
+	)))
 
 	log.Println("connect to http://localhost:8082/ for graphql playground")
 	log.Fatal(http.ListenAndServe(":8082", router))
