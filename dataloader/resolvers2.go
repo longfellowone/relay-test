@@ -155,8 +155,7 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 
 	fmt.Println("-------------------------------------------------")
 	filter := map[string]interface{}{
-		"first": 4,
-		"after": "cursor:1",
+		"first": 2,
 	}
 	args := NewConnectionArguments(filter)
 

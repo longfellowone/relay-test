@@ -31,7 +31,7 @@ func LoaderMiddleware(db *sqlx.DB, next http.Handler) http.Handler {
 			fetch: func(keys []string) ([][]string, []error) {
 				errors := make([]error, len(keys))
 
-				query, args, err := sqlx.In("SELECT orderid,projectid FROM orders WHERE orders.projectid IN (?) ORDER by sentdate ASC", keys)
+				query, args, err := sqlx.In("SELECT orderid,projectid FROM orders WHERE orders.projectid IN (?) ORDER by sentdate DESC", keys)
 				query = db.Rebind(query)
 
 				rows, err := db.Query(query, args...)
