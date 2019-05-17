@@ -5,5 +5,7 @@ resolver:
 models:
   Order:
     model: dataloader.Order
+  OrderConnection:
+    model: dataloader.OrderConnection
   Project:
     model: dataloader.Project

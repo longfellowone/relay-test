@@ -1,5 +1,6 @@
-//go:generate go run github.com/vektah/dataloaden OrderConnectionLoader string *dataloader.OrderConnection
-//go:generate go run github.com/vektah/dataloaden ProjectConnectionLoader string *dataloader.ProjectConnection
+////go:generate go run github.com/vektah/dataloaden OrderConnectionLoader string *dataloader.OrderConnection
+////go:generate go run github.com/vektah/dataloaden ProjectConnectionLoader string *dataloader.ProjectConnection
+//go:generate go run github.com/vektah/dataloaden OrderIDsByProjectLoader string []string
 
 package dataloader
 
@@ -16,7 +17,7 @@ type ctxKeyType struct{ name string }
 var ctxKey = ctxKeyType{"userCtx"}
 
 type loaders struct {
-	ordersByProject *OrderConnectionLoader
+	orderIDsByProject *OrderIDsByProjectLoader
 }
 
 func LoaderMiddleware(next http.Handler) http.Handler {
@@ -25,26 +26,43 @@ func LoaderMiddleware(next http.Handler) http.Handler {
 
 		wait := 250 * time.Microsecond
 
-		ldrs.ordersByProject = &OrderConnectionLoader{
+		ldrs.orderIDsByProject = &OrderIDsByProjectLoader{
 			wait:     wait,
 			maxBatch: 100,
-			fetch: func(keys []string) ([]*OrderConnection, []error) {
+			fetch: func(keys []string) ([][]string, []error) {
 				fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keys, ","))
 				time.Sleep(5 * time.Millisecond)
 
-				orderConnections := make([]*OrderConnection, len(keys))
+				orderIDs := make([][]string, len(keys))
 				errors := make([]error, len(keys))
-				for i, key := range keys {
-
-					edges := []*OrderEdge{
-						{Node: &Order{ID: key}, Cursor: "testing"},
-					}
-
-					orderConnections[i] = &OrderConnection{Edges: edges, PageInfo: &PageInfo{HasPreviousPage: true}}
+				for i := range keys {
+					orderIDs[i] = []string{"1", "2", "3"}
 				}
-				return orderConnections, errors
+
+				return orderIDs, errors
 			},
 		}
+
+		//ldrs.ordersByProject = &OrderConnectionLoader{
+		//	wait:     wait,
+		//	maxBatch: 100,
+		//	fetch: func(keys []string) ([]*OrderConnection, []error) {
+		//		fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keys, ","))
+		//		time.Sleep(5 * time.Millisecond)
+		//
+		//		orderConnections := make([]*OrderConnection, len(keys))
+		//		errors := make([]error, len(keys))
+		//		for i, key := range keys {
+		//
+		//			edges := []*OrderEdge{
+		//				{Node: &Order{ID: key}, Cursor: "testing"},
+		//			}
+		//
+		//			orderConnections[i] = &OrderConnection{Edges: edges, PageInfo: &PageInfo{HasPreviousPage: true}}
+		//		}
+		//		return orderConnections, errors
+		//	},
+		//}
 
 		dlCtx := context.WithValue(r.Context(), ctxKey, ldrs)
 		next.ServeHTTP(w, r.WithContext(dlCtx))

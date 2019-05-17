@@ -6,11 +6,6 @@ type Node interface {
 	IsNode()
 }
 
-type OrderConnection struct {
-	PageInfo *PageInfo    `json:"pageInfo"`
-	Edges    []*OrderEdge `json:"edges"`
-}
-
 type OrderEdge struct {
 	Node   *Order `json:"node"`
 	Cursor string `json:"cursor"`
@@ -24,8 +19,9 @@ type PageInfo struct {
 }
 
 type ProjectConnection struct {
-	PageInfo *PageInfo      `json:"pageInfo"`
-	Edges    []*ProjectEdge `json:"edges"`
+	TotalCount int            `json:"totalCount"`
+	PageInfo   *PageInfo      `json:"pageInfo"`
+	Edges      []*ProjectEdge `json:"edges"`
 }
 
 type ProjectEdge struct {

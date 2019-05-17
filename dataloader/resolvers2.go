@@ -4,8 +4,11 @@ package dataloader
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"strconv"
+	"strings"
 )
 
 type Project struct {
@@ -30,6 +33,28 @@ type Order struct {
 
 func (Order) IsNode() {}
 
+type OrderConnection struct {
+	IDs  []string
+	From string
+	To   string
+}
+
+func (c *OrderConnection) TotalCount() int {
+	return len(c.IDs)
+}
+
+func (c *OrderConnection) PageInfo() PageInfo {
+	return PageInfo{
+		//StartCursor: EncodeCursor(c.From),
+		//EndCursor:   EncodeCursor(c.To - 1),
+		//HasNextPage: c.To < len(c.IDs),
+	}
+}
+
+//func EncodeCursor(i string) string {
+//	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("cursor%d", i+1)))
+//}
+
 type Resolver struct {
 	DB *sqlx.DB
 }
@@ -38,151 +63,70 @@ func (r *Resolver) Query() QueryResolver {
 	return &queryResolver{r}
 }
 
-//func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
-//	// Newest to oldest 120, 110, 100, 90, 80, 70
-//
-//	// If the after argument is provided, add id > parsed_cursor to the WHERE clause
-//	var orders []Order
-//	err := r.DB.Select(&orders, "SELECT * FROM orders WHERE sentdate < 110 order by sentdate DESC LIMIT 2")
-//	if err != nil {
-//		fmt.Println(err)
-//	}
-//
-//	for _, o := range orders {
-//
-//		fmt.Println(o.ID)
-//	}
-//
-//	//return ctxLoaders(ctx).ordersByProject.Load(obj.ID)
-//	return &OrderConnection{}, nil
-//}
-
 func (r *Resolver) Project() ProjectResolver {
 	return &projectResolver{r}
 }
 
+func (r *Resolver) resolveOrderConnection(orderIDS []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+	fmt.Println(orderIDS)
+
+	from := 0
+	if after != nil {
+		b, err := base64.StdEncoding.DecodeString(*after)
+		if err != nil {
+			return nil, err
+		}
+		i, err := strconv.Atoi(strings.TrimPrefix(string(b), "cursor"))
+		if err != nil {
+			return nil, err
+		}
+		from = i
+	}
+
+	to := len(orderIDS)
+	if first != nil {
+		to = from + *first
+		if to > len(orderIDS) {
+			to = len(orderIDS)
+		}
+	}
+
+	//TODO: before, last
+
+	fmt.Println(from, to)
+
+	return &OrderConnection{}, nil
+}
+
 type queryResolver struct{ *Resolver }
 
+func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+	// If user == purchaser load by org, else load ids by ctxUser
+	//orderIDs := ctxLoaders(ctx).orderIdsByOrganization.Load(obj.ID)
+
+	//return r.resolveOrderConnection(orderIDs, after, first, before, last)
+	return &OrderConnection{}, nil
+}
+
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
-	const query = `
-		SELECT 
-		id, name
-		FROM projects
-		LEFT JOIN orders on orders.projectid = id
--- 		WHERE projectid = $1
--- 		WHERE projectid IN ($1)
-	`
 
-	var projects []Project
-	err := r.DB.Select(&projects, query)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	for _, p := range projects {
-		//fmt.Println(p.ID, p.Name, p.OrderID)
-		fmt.Println(p)
-	}
+	fmt.Println("SELECT * FROM projects WHERE orgID = ctxUserID")
+	// Prime cache with project by id
 
 	return []*Project{{ID: "projectID01"}, {ID: "projectID02"}}, nil
 }
 
-//func (r *queryResolver) Projects(ctx context.Context, id string) (*ProjectConnection, error) {
-//	const query = `
-//		SELECT
-//		orderid, projectid
-//		FROM orders
-//		LEFT JOIN projects on orders.projectid = id
-//		WHERE projectid IN ($1,$2)
-//	`
-//
-//	var projects []Project
-//	err := r.DB.Select(&projects, query, id, "")
-//	if err != nil {
-//		fmt.Println(err)
-//	}
-//
-//	for _, p := range projects {
-//		//fmt.Println(p.ID, p.Name, p.OrderID)
-//		fmt.Println(p.OrderID)
-//	}
-//
-//	// No duplicate orders so join orders_id's on project
-//
-//	// Use load projects WHERE in orgID (From context)
-//	//fmt.Println("SELECT * FROM project WHERE id = id")
-//
-//	// loader loaderOrderIds from project id
-//	// Pass add order IDs to project struct
-//
-//	return &ProjectConnection{}, nil
-//}
-
 type projectResolver struct{ *Resolver }
 
 func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
-
-	fmt.Println(obj)
-
-	//	const query = `
-	//		SELECT
-	//		id, name
-	//		FROM projects
-	//		LEFT JOIN orders on orders.projectid = id
-	//		WHERE projectid = $1
-	//-- 		WHERE projectid IN ($1)
-	//	`
-	//
-	//	var projects []Project
-	//	err := r.DB.Select(&projects, query, obj.ID)
-	//	if err != nil {
-	//		fmt.Println(err)
-	//	}
-	//
-	//	for _, p := range projects {
-	//		//fmt.Println(p.ID, p.Name, p.OrderID)
-	//		fmt.Println(p)
-	//	}
-
-	//fmt.Println(obj.OrderID)
-
 	// Newest to oldest 120, 110, 100, 90, 80, 70
 
-	// If the after argument is provided, add id > parsed_cursor to the WHERE clause
-	//var orders []Order
-	//err := r.DB.Select(&orders, "SELECT * FROM orders WHERE projectid=$1 AND sentdate < 110 order by sentdate DESC LIMIT 2", obj.ID)
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
+	orderIDs, err := ctxLoaders(ctx).orderIDsByProject.Load(obj.ID)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	//for _, o := range orders {
-	//	fmt.Println(o.ID)
-	//}
-
-	// load orders by project ID
-	//fmt.Println("Select * FROM orders WHERE projectID in (2,8,12)")
-
-	//return ctxLoaders(ctx).ordersByProject.Load(obj.ID)
-	return &OrderConnection{}, nil
+	return r.resolveOrderConnection(orderIDs, after, first, before, last)
 }
 
-// Prime project to order loader
-//const resolvers = {
-//Query: {
-//users: async (root, args, { userLoader }) => {
-//// Our loader can't get all users, so let's use the model directly here
-//const allUsers = await User.find({})
-//// then tell the loader about the users we found
-//for (const user of allUsers) {
-//userLoader.prime(user.id, user);
-//}
-//// and finally return the result
-//return allUsers
-//}
-//},
-//User: {
-//friends: async (user, args, { userLoader }) => {
-//return userLoader.loadMany(user.friendIds)
-//},
-//},
-//}
+// r.DB.Select(&orders, "SELECT * FROM orders WHERE sentdate < 110 order by sentdate DESC LIMIT 2")

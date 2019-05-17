@@ -5,10 +5,11 @@ interface Node {
 type Query {
     projects: [Project]
 #    projects(after: String, first: Int, before: String, last: Int): ProjectConnection
-#    orders(after: String, first: Int, before: String, last: Int): OrderConnection
+    orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }
 
 type ProjectConnection {
+    totalCount: Int!
     pageInfo: PageInfo!
     edges: [ProjectEdge]
 }
@@ -25,6 +26,7 @@ type Project implements Node {
 }
 
 type OrderConnection {
+    totalCount: Int!
     pageInfo: PageInfo!
     edges: [OrderEdge]
 }
