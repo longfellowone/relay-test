@@ -99,6 +99,10 @@ func (r *Resolver) resolveOrders(ctx context.Context, ids []string) ([]*Order, e
 
 type Filter map[string]interface{}
 
+//resolve: (user, { first }) => queryLoader.load([
+//'SELECT toID FROM friends WHERE fromID=? LIMIT ?', user.id, first
+//]).then(rows => rows.map(row => userLoader.load(row.toID)))
+
 func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
 
 	temp := func(filter Filter) ([]string, int, int) {
@@ -153,7 +157,7 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 
 	filter := map[string]interface{}{
 		"first": 4,
-		//"after": "cursor:1",
+		//"after": "cursor:0",
 	}
 
 	ids, begin, end := temp(filter)
@@ -211,6 +215,11 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	//	}
 	//	fmt.Println(id, name)
 	//}
+
+	//SELECT p.id, p.name, array_agg(o.orderid ORDER BY o.sentdate DESC) as order_ids
+	//FROM projects p INNER JOIN orders o on p.id = o.projectid
+	//GROUP BY p.id
+	//s := strings.Split("a,b,c", ",")
 
 	return []*Project{{ID: "projectID01"}, {ID: "projectID02"}, {ID: "projectID03"}}, nil
 }
