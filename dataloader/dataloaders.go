@@ -69,10 +69,9 @@ func LoaderMiddleware(db *sqlx.DB, next http.Handler) http.Handler {
 			maxBatch: 100,
 			fetch: func(keys []string) ([]*Order, []error) {
 				time.Sleep(5 * time.Millisecond)
-
 				errors := make([]error, len(keys))
 
-				query, args, err := sqlx.In("SELECT orderid,projectid FROM orders WHERE orderid IN (?) ORDER by sentdate DESC", keys)
+				query, args, err := sqlx.In("SELECT orderid,projectid,sentdate FROM orders WHERE orderid IN (?) ORDER by sentdate DESC", keys)
 				query = db.Rebind(query)
 
 				rows, err := db.Query(query, args...)
@@ -84,12 +83,13 @@ func LoaderMiddleware(db *sqlx.DB, next http.Handler) http.Handler {
 
 				var orderid string
 				var projectid string
+				var sentDate int64
 
 				for rows.Next() {
-					if err := rows.Scan(&orderid, &projectid); err != nil {
+					if err := rows.Scan(&orderid, &projectid, &sentDate); err != nil {
 						errors = append(errors, err)
 					}
-					orders = append(orders, &Order{ID: orderid, ProjectId: projectid})
+					orders = append(orders, &Order{ID: orderid, ProjectId: projectid, SentDate: sentDate})
 				}
 
 				return orders, errors

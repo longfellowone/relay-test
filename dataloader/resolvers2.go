@@ -44,6 +44,7 @@ func (c *OrderConnection) TotalCount() int {
 }
 
 func (c *OrderConnection) PageInfo() PageInfo {
+
 	return PageInfo{
 		//StartCursor: EncodeCursor(c.From),
 		//EndCursor:   EncodeCursor(c.To - 1),
@@ -72,23 +73,6 @@ func (r *Resolver) Project() ProjectResolver {
 type orderConnectionResolver struct{ *Resolver }
 
 func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnection) ([]*OrderEdge, error) {
-
-	fmt.Println(obj.IDs, obj.Begin, obj.End)
-
-	//friends, err := r.resolveCharacters(ctx, obj.Ids)
-	//if err != nil {
-	//	return nil, err
-	//}
-	//
-	//edges := make([]*models.FriendsEdge, obj.To-obj.From)
-	//for i := range edges {
-	//	edges[i] = &models.FriendsEdge{
-	//		Cursor: models.EncodeCursor(obj.From + i),
-	//		Node:   friends[obj.From+i],
-	//	}
-	//}
-	//return edges, nil
-
 	orders, err := r.resolveOrders(ctx, obj.IDs)
 	if err != nil {
 		fmt.Println(err)
@@ -107,10 +91,8 @@ func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnectio
 }
 
 func (r *Resolver) resolveOrders(ctx context.Context, ids []string) ([]*Order, error) {
-	orders, err := ctxLoaders(ctx).orderLoader.LoadAll(ids)
-	if err != nil {
-		fmt.Println(err)
-	}
+	// TODO: Fix errors, returns [nil] rather than nil
+	orders, _ := ctxLoaders(ctx).orderLoader.LoadAll(ids)
 
 	return orders, nil
 }
@@ -148,23 +130,23 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 
 		slice := arraySlice[begin:end]
 
-		var firstEdgeCursor, lastEdgeCursor ConnectionCursor
-		if len(slice) > 0 {
-			firstEdgeCursor = OffsetToCursor(startOffset)
-			lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
-		}
+		//var firstEdgeCursor, lastEdgeCursor ConnectionCursor
+		//if len(slice) > 0 {
+		//	firstEdgeCursor = OffsetToCursor(startOffset)
+		//	lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
+		//}
+		//
+		//hasPreviousPage := false
+		//if startOffset > 0 {
+		//	hasPreviousPage = true
+		//}
+		//
+		//hasNextPage := false
+		//if endOffset < arrayLength {
+		//	hasNextPage = true
+		//}
 
-		hasPreviousPage := false
-		if startOffset > 0 {
-			hasPreviousPage = true
-		}
-
-		hasNextPage := false
-		if endOffset < arrayLength {
-			hasNextPage = true
-		}
-
-		fmt.Println(firstEdgeCursor, lastEdgeCursor, hasPreviousPage, hasNextPage)
+		//fmt.Println(firstEdgeCursor, lastEdgeCursor, hasPreviousPage, hasNextPage)
 
 		return slice, begin, end
 	}
@@ -189,8 +171,18 @@ func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, b
 	// If user == purchaser load by org, else load ids by ctxUser
 	//orderIDs := ctxLoaders(ctx).orderIdsByOrganization.Load(obj.ID)
 
-	//return r.resolveOrderConnection(orderIDs, after, first, before, last)
-	return &OrderConnection{}, nil
+	var orders []*Order
+	err := r.DB.Select(&orders, "SELECT * FROM orders ORDER BY sentdate DESC")
+	if err != nil {
+		return &OrderConnection{}, err
+	}
+
+	orderIDs := make([]string, len(orders))
+	for i := range orderIDs {
+		orderIDs[i] = orders[i].ID
+	}
+
+	return r.resolveOrderConnection(orderIDs, after, first, before, last)
 }
 
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
@@ -236,16 +228,15 @@ func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *strin
 	return r.resolveOrderConnection(orderIDs, after, first, before, last)
 }
 
-// r.DB.Select(&orders, "SELECT * FROM orders WHERE sentdate < 110 order by sentdate DESC LIMIT 2")
 const PREFIX = "cursor:"
 
 type ConnectionCursor string
 
 type ConnectionArguments struct {
-	Before ConnectionCursor `json:"before"`
-	After  ConnectionCursor `json:"after"`
-	First  int              `json:"first"` // -1 for undefined, 0 would return zero results
-	Last   int              `json:"last"`  //  -1 for undefined, 0 would return zero results
+	Before ConnectionCursor
+	After  ConnectionCursor
+	First  int
+	Last   int
 }
 
 func NewConnectionArguments(filters map[string]interface{}) ConnectionArguments {

@@ -39,6 +39,7 @@ type OrderEdge {
 type Order implements Node {
     id: ID!
     comments: String!
+    sentDate: Int!
 #    date: Time!
 }
 
