@@ -151,82 +151,93 @@ func NewConnectionArguments(filters map[string]interface{}) ConnectionArguments 
 	return conn
 }
 
+type Filter map[string]interface{}
+
 func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
 
-	fmt.Println("-------------------------------------------------")
+	temp := func(filter Filter) {
+		args := NewConnectionArguments(filter)
+
+		arraySlice := orderIDs
+		arrayLength := len(arraySlice)
+
+		beforeOffset := GetOffsetWithDefault(args.Before, arrayLength)
+		afterOffset := GetOffsetWithDefault(args.After, -1)
+
+		startOffset := ternaryMax(0-1, afterOffset, -1) + 1
+		endOffset := ternaryMin(arrayLength, beforeOffset, arrayLength)
+
+		if args.First != -1 {
+			endOffset = min(endOffset, startOffset+args.First)
+		}
+
+		if args.Last != -1 {
+			startOffset = max(startOffset, endOffset-args.Last)
+		}
+
+		begin := max(startOffset, 0)
+		end := arrayLength - (arrayLength - endOffset)
+
+		if begin > end {
+			return
+		}
+
+		slice := arraySlice[begin:end]
+
+		//for index, value := range slice {
+		//	fmt.Println(value, OffsetToCursor(startOffset+index))
+		//}
+
+		var firstEdgeCursor, lastEdgeCursor ConnectionCursor
+		if len(slice) > 0 {
+			firstEdgeCursor = OffsetToCursor(startOffset)
+			lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
+		}
+
+		hasPreviousPage := false
+		if startOffset > 0 {
+			hasPreviousPage = true
+		}
+
+		hasNextPage := false
+		if endOffset < arrayLength {
+			hasNextPage = true
+		}
+
+		fmt.Println(firstEdgeCursor, lastEdgeCursor, hasPreviousPage, hasNextPage)
+	}
+
 	filter := map[string]interface{}{
 		"first": 2,
 	}
-	args := NewConnectionArguments(filter)
 
-	meta := ArraySliceMetaInfo{
-		SliceStart:  0,
-		ArrayLength: len(orderIDs),
-	}
-
-	arraySlice := orderIDs
-
-	sliceEnd := meta.SliceStart + len(arraySlice)
-	beforeOffset := GetOffsetWithDefault(args.Before, meta.ArrayLength)
-	afterOffset := GetOffsetWithDefault(args.After, -1)
-
-	startOffset := ternaryMax(meta.SliceStart-1, afterOffset, -1) + 1
-	endOffset := ternaryMin(sliceEnd, beforeOffset, meta.ArrayLength)
-
-	if args.First != -1 {
-		endOffset = min(endOffset, startOffset+args.First)
-	}
-
-	if args.Last != -1 {
-		startOffset = max(startOffset, endOffset-args.Last)
-	}
-
-	begin := max(startOffset-meta.SliceStart, 0)
-	end := len(arraySlice) - (sliceEnd - endOffset)
-
-	if begin > end {
-		return &OrderConnection{}, nil
-	}
-
-	slice := arraySlice[begin:end]
-
-	for index, value := range slice {
-		fmt.Println(value, OffsetToCursor(startOffset+index))
-	}
-
-	var firstEdgeCursor, lastEdgeCursor ConnectionCursor
-	if len(slice) > 0 {
-		firstEdgeCursor = OffsetToCursor(startOffset)
-		lastEdgeCursor = OffsetToCursor(startOffset + (len(slice) - 1))
-	}
-
-	lowerBound := 0
-	if len(args.After) > 0 {
-		lowerBound = afterOffset + 1
-	}
-
-	upperBound := meta.ArrayLength
-	if len(args.Before) > 0 {
-		upperBound = beforeOffset
-	}
-
-	hasPreviousPage := false
-	if args.Last != -1 {
-		hasPreviousPage = startOffset > lowerBound
-	}
-
-	hasNextPage := false
-	if args.First != -1 {
-		hasNextPage = endOffset < upperBound
-	}
-
-	fmt.Println(firstEdgeCursor, lastEdgeCursor, hasNextPage, hasPreviousPage)
+	temp(filter)
 
 	return &OrderConnection{
 		IDs:   orderIDs,
 		After: after,
 		First: first,
 	}, nil
+
+	//lowerBound := 0
+	//if len(args.After) > 0 {
+	//	lowerBound = afterOffset + 1
+	//}
+	//
+	//upperBound := arrayLength
+	//if len(args.Before) > 0 {
+	//	upperBound = beforeOffset
+	//}
+	//
+	//hasPreviousPage := false
+	//if args.Last != -1 {
+	//	hasPreviousPage = startOffset > lowerBound
+	//}
+	//
+	//hasNextPage := false
+	//if args.First != -1 {
+	//	hasNextPage = endOffset < upperBound
+	//}
 }
 
 type queryResolver struct{ *Resolver }
@@ -245,7 +256,7 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	// Prime cache with project by id
 
 	return []*Project{
-		{ID: "projectID01"},
+		//{ID: "projectID01"},
 		{ID: "projectID02"},
 	}, nil
 }
