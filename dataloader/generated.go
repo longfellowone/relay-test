@@ -97,7 +97,7 @@ type ProjectResolver interface {
 	Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error)
 }
 type QueryResolver interface {
-	Projects(ctx context.Context) (*ProjectConnection, error)
+	Projects(ctx context.Context) ([]*Project, error)
 	Orders(ctx context.Context, after *string, first *int, before *string, last *int) (*OrderConnection, error)
 }
 
@@ -342,7 +342,7 @@ var parsedSchema = gqlparser.MustLoadSchema(
 }
 
 type Query {
-    projects: ProjectConnection
+    projects: [Project]
 #    projects(after: String, first: Int, before: String, last: Int): ProjectConnection
     orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }
@@ -1035,10 +1035,10 @@ func (ec *executionContext) _Query_projects(ctx context.Context, field graphql.C
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*ProjectConnection)
+	res := resTmp.([]*Project)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalOProjectConnection2ᚖdataloaderᚐProjectConnection(ctx, field.Selections, res)
+	return ec.marshalOProject2ᚕᚖdataloaderᚐProject(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_orders(ctx context.Context, field graphql.CollectedField) graphql.Marshaler {
@@ -2945,22 +2945,51 @@ func (ec *executionContext) marshalOProject2dataloaderᚐProject(ctx context.Con
 	return ec._Project(ctx, sel, &v)
 }
 
+func (ec *executionContext) marshalOProject2ᚕᚖdataloaderᚐProject(ctx context.Context, sel ast.SelectionSet, v []*Project) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		rctx := &graphql.ResolverContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithResolverContext(ctx, rctx)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalOProject2ᚖdataloaderᚐProject(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+	return ret
+}
+
 func (ec *executionContext) marshalOProject2ᚖdataloaderᚐProject(ctx context.Context, sel ast.SelectionSet, v *Project) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._Project(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOProjectConnection2dataloaderᚐProjectConnection(ctx context.Context, sel ast.SelectionSet, v ProjectConnection) graphql.Marshaler {
-	return ec._ProjectConnection(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalOProjectConnection2ᚖdataloaderᚐProjectConnection(ctx context.Context, sel ast.SelectionSet, v *ProjectConnection) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._ProjectConnection(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOProjectEdge2dataloaderᚐProjectEdge(ctx context.Context, sel ast.SelectionSet, v ProjectEdge) graphql.Marshaler {

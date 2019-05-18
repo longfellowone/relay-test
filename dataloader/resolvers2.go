@@ -35,8 +35,8 @@ func (Order) IsNode() {}
 
 type OrderConnection struct {
 	IDs   []string
-	After *string
-	First *int
+	Begin int
+	End   int
 }
 
 func (c *OrderConnection) TotalCount() int {
@@ -72,10 +72,8 @@ func (r *Resolver) Project() ProjectResolver {
 type orderConnectionResolver struct{ *Resolver }
 
 func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnection) ([]*OrderEdge, error) {
-	//fmt.Println("he")
-	//for _, value := range obj.IDs {
-	//	fmt.Println(value)
-	//}
+
+	fmt.Println(obj.IDs, obj.Begin, obj.End)
 
 	//friends, err := r.resolveCharacters(ctx, obj.Ids)
 	//if err != nil {
@@ -91,39 +89,155 @@ func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnectio
 	//}
 	//return edges, nil
 
-	//fmt.Println(obj.IDs)
-	return []*OrderEdge{{
-		Node: &Order{
-			ID:           "",
-			ProjectId:    "",
-			Status:       0,
-			ProjectName:  "",
-			ForemanEmail: "",
-			SentDate:     0,
-			Comments:     "",
-		},
-		Cursor: "",
-	}}, nil
+	orders, err := r.resolveOrders(ctx, obj.IDs)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	edges := make([]*OrderEdge, obj.End-obj.Begin)
+
+	for i := range edges {
+		edges[i] = &OrderEdge{
+			Node:   orders[i],
+			Cursor: strconv.Itoa(obj.Begin + i),
+		}
+	}
+
+	return edges, nil
 }
 
 func (r *Resolver) resolveOrders(ctx context.Context, ids []string) ([]*Order, error) {
-	//var result []models.Character
-	//for _, id := range ids {
-	//	char, err := r.Query().Character(ctx, id)
-	//	if err != nil {
-	//		return nil, err
-	//	}
-	//	result = append(result, char)
+	orders, err := ctxLoaders(ctx).orderLoader.LoadAll(ids)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return orders, nil
+}
+
+type Filter map[string]interface{}
+
+func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+
+	temp := func(filter Filter) ([]string, int, int) {
+		args := NewConnectionArguments(filter)
+
+		arraySlice := orderIDs
+		arrayLength := len(arraySlice)
+
+		beforeOffset := GetOffsetWithDefault(args.Before, arrayLength)
+		afterOffset := GetOffsetWithDefault(args.After, -1)
+
+		startOffset := max(afterOffset, -1) + 1
+		endOffset := min(beforeOffset, arrayLength)
+
+		if args.First != -1 {
+			endOffset = min(endOffset, startOffset+args.First)
+		}
+
+		if args.Last != -1 {
+			startOffset = max(startOffset, endOffset-args.Last)
+		}
+
+		begin := startOffset
+		end := arrayLength - (arrayLength - endOffset)
+
+		if begin > end {
+			return nil, 0, 0
+		}
+
+		slice := arraySlice[begin:end]
+
+		var firstEdgeCursor, lastEdgeCursor ConnectionCursor
+		if len(slice) > 0 {
+			firstEdgeCursor = OffsetToCursor(startOffset)
+			lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
+		}
+
+		hasPreviousPage := false
+		if startOffset > 0 {
+			hasPreviousPage = true
+		}
+
+		hasNextPage := false
+		if endOffset < arrayLength {
+			hasNextPage = true
+		}
+
+		fmt.Println(firstEdgeCursor, lastEdgeCursor, hasPreviousPage, hasNextPage)
+
+		return slice, begin, end
+	}
+
+	filter := map[string]interface{}{
+		"first": 4,
+		//"after": "cursor:1",
+	}
+
+	ids, begin, end := temp(filter)
+
+	return &OrderConnection{
+		IDs:   ids,
+		Begin: begin,
+		End:   end,
+	}, nil
+}
+
+type queryResolver struct{ *Resolver }
+
+func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+	// If user == purchaser load by org, else load ids by ctxUser
+	//orderIDs := ctxLoaders(ctx).orderIdsByOrganization.Load(obj.ID)
+
+	//return r.resolveOrderConnection(orderIDs, after, first, before, last)
+	return &OrderConnection{}, nil
+}
+
+func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
+
+	fmt.Println("SELECT * FROM projects WHERE orgID = ctxUserOrgID")
+	// Prime cache with project by id
+
+	//const query = `
+	//	SELECT
+	//	id, name
+	//	FROM projects
+	//`
+	//
+	//rows, err := r.DB.Query(query)
+	//if err != nil {
+	//	fmt.Println(err)
 	//}
-	//return result, nil
-	return []*Order{}, nil
+	//
+	//var id string
+	//var name string
+	//
+	//for rows.Next() {
+	//
+	//	if err := rows.Scan(&id, &name); err != nil {
+	//		fmt.Println(err)
+	//	}
+	//	fmt.Println(id, name)
+	//}
 
+	return []*Project{{ID: "projectID01"}, {ID: "projectID02"}, {ID: "projectID03"}}, nil
 }
 
-type ArraySliceMetaInfo struct {
-	SliceStart  int `json:"sliceStart"`
-	ArrayLength int `json:"arrayLength"`
+type projectResolver struct{ *Resolver }
+
+func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+	// Newest to oldest 120, 110, 100, 90, 80, 70
+
+	orderIDs, err := ctxLoaders(ctx).orderIDsByProject.Load(obj.ID)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return r.resolveOrderConnection(orderIDs, after, first, before, last)
 }
+
+// r.DB.Select(&orders, "SELECT * FROM orders WHERE sentdate < 110 order by sentdate DESC LIMIT 2")
+const PREFIX = "cursor:"
 
 type ConnectionCursor string
 
@@ -161,152 +275,6 @@ func NewConnectionArguments(filters map[string]interface{}) ConnectionArguments 
 	}
 	return conn
 }
-
-type Filter map[string]interface{}
-
-func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
-
-	temp := func(filter Filter) {
-		args := NewConnectionArguments(filter)
-
-		arraySlice := orderIDs
-		arrayLength := len(arraySlice)
-
-		beforeOffset := GetOffsetWithDefault(args.Before, arrayLength)
-		afterOffset := GetOffsetWithDefault(args.After, -1)
-
-		startOffset := max(afterOffset, -1) + 1
-		endOffset := min(beforeOffset, arrayLength)
-
-		if args.First != -1 {
-			endOffset = min(endOffset, startOffset+args.First)
-		}
-
-		if args.Last != -1 {
-			startOffset = max(startOffset, endOffset-args.Last)
-		}
-
-		begin := startOffset
-		end := arrayLength - (arrayLength - endOffset)
-
-		if begin > end {
-			return
-		}
-
-		fmt.Println("start:", startOffset, "end:", endOffset)
-
-		slice := arraySlice[begin:end]
-
-		fmt.Println("begin:", begin, "end:", end)
-
-		//for index, value := range slice {
-		//	fmt.Println(value, OffsetToCursor(startOffset+index))
-		//}
-
-		var firstEdgeCursor, lastEdgeCursor ConnectionCursor
-		if len(slice) > 0 {
-			firstEdgeCursor = OffsetToCursor(startOffset)
-			lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
-		}
-
-		hasPreviousPage := false
-		if startOffset > 0 {
-			hasPreviousPage = true
-		}
-
-		hasNextPage := false
-		if endOffset < arrayLength {
-			hasNextPage = true
-		}
-
-		fmt.Println(firstEdgeCursor, lastEdgeCursor, hasPreviousPage, hasNextPage)
-	}
-
-	filter := map[string]interface{}{
-		"first": 4,
-		"after": "cursor:1",
-	}
-
-	temp(filter)
-
-	return &OrderConnection{
-		IDs:   orderIDs,
-		After: after,
-		First: first,
-	}, nil
-}
-
-type queryResolver struct{ *Resolver }
-
-func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
-	// If user == purchaser load by org, else load ids by ctxUser
-	//orderIDs := ctxLoaders(ctx).orderIdsByOrganization.Load(obj.ID)
-
-	//return r.resolveOrderConnection(orderIDs, after, first, before, last)
-	return &OrderConnection{}, nil
-}
-
-func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
-
-	fmt.Println("SELECT * FROM projects WHERE orgID = ctxUserID")
-	// Prime cache with project by id
-
-	const query = `
-		SELECT 
-		projects.id, projects.name, orders.orderid
-		FROM projects
-		LEFT JOIN orders on orders.projectid = id
-	`
-
-	rows, err := r.DB.Query(query)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	orderIDs := make(map[string][]string)
-	var id string
-	var name string
-
-	for rows.Next() {
-		var orderid string
-
-		if err := rows.Scan(&id, &name, &orderid); err != nil {
-			fmt.Println(err)
-		}
-
-		orderIDs[id] = append(orderIDs[id], orderid)
-	}
-
-	for key, _ := range orderIDs {
-		fmt.Println(key)
-	}
-
-	//for _, p := range projects {
-	//	//fmt.Println(p.ID, p.Name, p.OrderID)
-	//	fmt.Println(p)
-	//}
-
-	return []*Project{
-		{ID: "projectID01"},
-		//{ID: "projectID02"},
-	}, nil
-}
-
-type projectResolver struct{ *Resolver }
-
-func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
-	// Newest to oldest 120, 110, 100, 90, 80, 70
-
-	orderIDs, err := ctxLoaders(ctx).orderIDsByProject.Load(obj.ID)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	return r.resolveOrderConnection(orderIDs, after, first, before, last)
-}
-
-// r.DB.Select(&orders, "SELECT * FROM orders WHERE sentdate < 110 order by sentdate DESC LIMIT 2")
-const PREFIX = "cursor:"
 
 func OffsetToCursor(offset int) ConnectionCursor {
 	str := fmt.Sprintf("%v%v", PREFIX, offset)
