@@ -216,10 +216,23 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	//	fmt.Println(id, name)
 	//}
 
-	//SELECT p.id, p.name, array_agg(o.orderid ORDER BY o.sentdate DESC) as order_ids
-	//FROM projects p INNER JOIN orders o on p.id = o.projectid
-	//GROUP BY p.id
-	//s := strings.Split("a,b,c", ",")
+	//SELECT i.id, i.title, array_agg(i.title)
+	//FROM items i
+	//INNER JOIN items_tags it
+	//ON it.item_id = i.id
+	//INNER JOIN tags t
+	//ON t.id = it.tag_id
+	//GROUP BY i.id, i.title,
+
+	// https://lorenstewart.me/2017/12/03/postgresqls-array_agg-function/
+	// SELECT p.id, p.name, array_agg(o.orderid ORDER BY o.sentdate DESC) as order_ids
+	// FROM projects p INNER JOIN orders o on p.id = o.projectid
+	// GROUP BY p.id
+	// Use json_agg?
+	// ArrayData pq.StringArray
+	// https://stackoverflow.com/questions/44379851/get-postgresql-array-into-struct-with-structscan
+	// https://github.com/jmoiron/sqlx/issues/168
+	// s := strings.Split("a,b,c", ",")
 
 	return []*Project{{ID: "projectID01"}, {ID: "projectID02"}, {ID: "projectID03"}}, nil
 }
