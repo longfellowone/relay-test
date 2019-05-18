@@ -3,7 +3,7 @@ interface Node {
 }
 
 type Query {
-    projects: [Project]
+    projects: ProjectConnection
 #    projects(after: String, first: Int, before: String, last: Int): ProjectConnection
     orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }

@@ -92,7 +92,18 @@ func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnectio
 	//return edges, nil
 
 	//fmt.Println(obj.IDs)
-	return []*OrderEdge{}, nil
+	return []*OrderEdge{{
+		Node: &Order{
+			ID:           "",
+			ProjectId:    "",
+			Status:       0,
+			ProjectName:  "",
+			ForemanEmail: "",
+			SentDate:     0,
+			Comments:     "",
+		},
+		Cursor: "",
+	}}, nil
 }
 
 func (r *Resolver) resolveOrders(ctx context.Context, ids []string) ([]*Order, error) {
@@ -164,8 +175,8 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 		beforeOffset := GetOffsetWithDefault(args.Before, arrayLength)
 		afterOffset := GetOffsetWithDefault(args.After, -1)
 
-		startOffset := ternaryMax(0-1, afterOffset, -1) + 1
-		endOffset := ternaryMin(arrayLength, beforeOffset, arrayLength)
+		startOffset := max(afterOffset, -1) + 1
+		endOffset := min(beforeOffset, arrayLength)
 
 		if args.First != -1 {
 			endOffset = min(endOffset, startOffset+args.First)
@@ -175,14 +186,18 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 			startOffset = max(startOffset, endOffset-args.Last)
 		}
 
-		begin := max(startOffset, 0)
+		begin := startOffset
 		end := arrayLength - (arrayLength - endOffset)
 
 		if begin > end {
 			return
 		}
 
+		fmt.Println("start:", startOffset, "end:", endOffset)
+
 		slice := arraySlice[begin:end]
+
+		fmt.Println("begin:", begin, "end:", end)
 
 		//for index, value := range slice {
 		//	fmt.Println(value, OffsetToCursor(startOffset+index))
@@ -208,7 +223,8 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 	}
 
 	filter := map[string]interface{}{
-		"first": 2,
+		"first": 4,
+		"after": "cursor:1",
 	}
 
 	temp(filter)
@@ -218,26 +234,6 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 		After: after,
 		First: first,
 	}, nil
-
-	//lowerBound := 0
-	//if len(args.After) > 0 {
-	//	lowerBound = afterOffset + 1
-	//}
-	//
-	//upperBound := arrayLength
-	//if len(args.Before) > 0 {
-	//	upperBound = beforeOffset
-	//}
-	//
-	//hasPreviousPage := false
-	//if args.Last != -1 {
-	//	hasPreviousPage = startOffset > lowerBound
-	//}
-	//
-	//hasNextPage := false
-	//if args.First != -1 {
-	//	hasNextPage = endOffset < upperBound
-	//}
 }
 
 type queryResolver struct{ *Resolver }
@@ -255,9 +251,44 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	fmt.Println("SELECT * FROM projects WHERE orgID = ctxUserID")
 	// Prime cache with project by id
 
+	const query = `
+		SELECT 
+		projects.id, projects.name, orders.orderid
+		FROM projects
+		LEFT JOIN orders on orders.projectid = id
+	`
+
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	orderIDs := make(map[string][]string)
+	var id string
+	var name string
+
+	for rows.Next() {
+		var orderid string
+
+		if err := rows.Scan(&id, &name, &orderid); err != nil {
+			fmt.Println(err)
+		}
+
+		orderIDs[id] = append(orderIDs[id], orderid)
+	}
+
+	for key, _ := range orderIDs {
+		fmt.Println(key)
+	}
+
+	//for _, p := range projects {
+	//	//fmt.Println(p.ID, p.Name, p.OrderID)
+	//	fmt.Println(p)
+	//}
+
 	return []*Project{
-		//{ID: "projectID01"},
-		{ID: "projectID02"},
+		{ID: "projectID01"},
+		//{ID: "projectID02"},
 	}, nil
 }
 
@@ -318,17 +349,9 @@ func max(a, b int) int {
 	return a
 }
 
-func ternaryMax(a, b, c int) int {
-	return max(max(a, b), c)
-}
-
 func min(a, b int) int {
 	if a > b {
 		return b
 	}
 	return a
-}
-
-func ternaryMin(a, b, c int) int {
-	return min(min(a, b), c)
 }
