@@ -7,16 +7,17 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 	"strconv"
 	"strings"
 )
 
 type Project struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	OrderID   string `json:"order_ids"`
-	Comments  string
-	ProjectID string
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	OrderIDs []string `json:"order_ids"`
+	//Comments  string
+	//ProjectID string
 }
 
 func (Project) IsNode() {}
@@ -34,23 +35,24 @@ type Order struct {
 func (Order) IsNode() {}
 
 type OrderConnection struct {
-	IDs   []string
-	Begin int
-	End   int
+	IDs      []string
+	Begin    int
+	End      int
+	PageInfo *PageInfo `json:"pageInfo"`
 }
 
 func (c *OrderConnection) TotalCount() int {
 	return len(c.IDs)
 }
 
-func (c *OrderConnection) PageInfo() PageInfo {
-
-	return PageInfo{
-		//StartCursor: EncodeCursor(c.From),
-		//EndCursor:   EncodeCursor(c.To - 1),
-		//HasNextPage: c.To < len(c.IDs),
-	}
-}
+//func (c *OrderConnection) PageInfo() PageInfo {
+//
+//	return PageInfo{
+//		//StartCursor: EncodeCursor(c.From),
+//		//EndCursor:   EncodeCursor(c.To - 1),
+//		//HasNextPage: c.To < len(c.IDs),
+//	}
+//}
 
 //func EncodeCursor(i string) string {
 //	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("cursor%d", i+1)))
@@ -105,7 +107,7 @@ type Filter map[string]interface{}
 
 func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
 
-	temp := func(filter Filter) ([]string, int, int) {
+	temp := func(filter Filter) ([]string, int, int, *PageInfo) {
 		args := NewConnectionArguments(filter)
 
 		arraySlice := orderIDs
@@ -129,30 +131,36 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 		end := arrayLength - (arrayLength - endOffset)
 
 		if begin > end {
-			return nil, 0, 0
+			return nil, 0, 0, &PageInfo{}
 		}
 
 		slice := arraySlice[begin:end]
 
 		//var firstEdgeCursor, lastEdgeCursor ConnectionCursor
-		//if len(slice) > 0 {
-		//	firstEdgeCursor = OffsetToCursor(startOffset)
-		//	lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
-		//}
-		//
-		//hasPreviousPage := false
-		//if startOffset > 0 {
-		//	hasPreviousPage = true
-		//}
-		//
-		//hasNextPage := false
-		//if endOffset < arrayLength {
-		//	hasNextPage = true
-		//}
+		var firstEdgeCursor, lastEdgeCursor *string
+		if len(slice) > 0 {
+			firstEdgeCursor = OffsetToCursor(startOffset)
+			lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
+		}
 
-		//fmt.Println(firstEdgeCursor, lastEdgeCursor, hasPreviousPage, hasNextPage)
+		hasPreviousPage := false
+		if startOffset > 0 {
+			hasPreviousPage = true
+		}
 
-		return slice, begin, end
+		hasNextPage := false
+		if endOffset < arrayLength {
+			hasNextPage = true
+		}
+
+		pageInfo := &PageInfo{
+			HasNextPage:     hasNextPage,
+			HasPreviousPage: hasPreviousPage,
+			StartCursor:     firstEdgeCursor,
+			EndCursor:       lastEdgeCursor,
+		}
+
+		return slice, begin, end, pageInfo
 	}
 
 	filter := map[string]interface{}{
@@ -160,12 +168,13 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 		//"after": "cursor:0",
 	}
 
-	ids, begin, end := temp(filter)
+	ids, begin, end, pageInfo := temp(filter)
 
 	return &OrderConnection{
-		IDs:   ids,
-		Begin: begin,
-		End:   end,
+		IDs:      ids,
+		Begin:    begin,
+		End:      end,
+		PageInfo: pageInfo,
 	}, nil
 }
 
@@ -194,47 +203,40 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	fmt.Println("SELECT * FROM projects WHERE orgID = ctxUserOrgID")
 	// Prime cache with project by id
 
-	//const query = `
-	//	SELECT
-	//	id, name
-	//	FROM projects
-	//`
-	//
-	//rows, err := r.DB.Query(query)
-	//if err != nil {
-	//	fmt.Println(err)
-	//}
-	//
-	//var id string
-	//var name string
-	//
-	//for rows.Next() {
-	//
-	//	if err := rows.Scan(&id, &name); err != nil {
-	//		fmt.Println(err)
-	//	}
-	//	fmt.Println(id, name)
-	//}
+	const query = `
+		SELECT p.id, p.name, array_agg(o.orderid ORDER BY o.sentdate DESC) as order_ids
+		FROM projects p INNER JOIN orders o on p.id = o.projectid
+		GROUP BY p.id
+		ORDER BY p.name ASC 
+	`
 
-	//SELECT i.id, i.title, array_agg(i.title)
-	//FROM items i
-	//INNER JOIN items_tags it
-	//ON it.item_id = i.id
-	//INNER JOIN tags t
-	//ON t.id = it.tag_id
-	//GROUP BY i.id, i.title,
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	// https://lorenstewart.me/2017/12/03/postgresqls-array_agg-function/
-	// SELECT p.id, p.name, array_agg(o.orderid ORDER BY o.sentdate DESC) as order_ids
-	// FROM projects p INNER JOIN orders o on p.id = o.projectid
-	// GROUP BY p.id
-	// Use json_agg?
-	// ArrayData pq.StringArray
-	// https://stackoverflow.com/questions/44379851/get-postgresql-array-into-struct-with-structscan
-	// https://github.com/jmoiron/sqlx/issues/168
-	// s := strings.Split("a,b,c", ",")
+	var id string
+	var name string
+	var order_ids []string
 
-	return []*Project{{ID: "projectID01"}, {ID: "projectID02"}, {ID: "projectID03"}}, nil
+	var projects []*Project
+
+	for rows.Next() {
+
+		if err := rows.Scan(&id, &name, pq.Array(&order_ids)); err != nil {
+			fmt.Println(err)
+		}
+
+		projects = append(projects, &Project{
+			ID:       id,
+			Name:     name,
+			OrderIDs: order_ids,
+		})
+
+		fmt.Println(id, name, order_ids)
+	}
+
+	return projects, nil
 }
 
 type projectResolver struct{ *Resolver }
@@ -242,12 +244,12 @@ type projectResolver struct{ *Resolver }
 func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
 	// Newest to oldest 120, 110, 100, 90, 80, 70
 
-	orderIDs, err := ctxLoaders(ctx).orderIDsByProject.Load(obj.ID)
-	if err != nil {
-		fmt.Println(err)
-	}
+	//orderIDs, err := ctxLoaders(ctx).orderIDsByProject.Load(obj.ID)
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
 
-	return r.resolveOrderConnection(orderIDs, after, first, before, last)
+	return r.resolveOrderConnection(obj.OrderIDs, after, first, before, last)
 }
 
 const PREFIX = "cursor:"
@@ -289,10 +291,10 @@ func NewConnectionArguments(filters map[string]interface{}) ConnectionArguments 
 	return conn
 }
 
-func OffsetToCursor(offset int) ConnectionCursor {
+func OffsetToCursor(offset int) *string {
 	str := fmt.Sprintf("%v%v", PREFIX, offset)
 	//return ConnectionCursor(base64.StdEncoding.EncodeToString([]byte(str)))
-	return ConnectionCursor(str)
+	return &str
 }
 
 // Re-derives the offset from the cursor string.

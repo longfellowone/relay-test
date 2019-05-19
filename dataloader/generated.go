@@ -642,13 +642,13 @@ func (ec *executionContext) _OrderConnection_pageInfo(ctx context.Context, field
 		Object:   "OrderConnection",
 		Field:    field,
 		Args:     nil,
-		IsMethod: true,
+		IsMethod: false,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp := ec.FieldMiddleware(ctx, obj, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PageInfo(), nil
+		return obj.PageInfo, nil
 	})
 	if resTmp == nil {
 		if !ec.HasError(rctx) {
@@ -656,10 +656,10 @@ func (ec *executionContext) _OrderConnection_pageInfo(ctx context.Context, field
 		}
 		return graphql.Null
 	}
-	res := resTmp.(PageInfo)
+	res := resTmp.(*PageInfo)
 	rctx.Result = res
 	ctx = ec.Tracer.StartFieldChildExecution(ctx)
-	return ec.marshalNPageInfo2dataloaderᚐPageInfo(ctx, field.Selections, res)
+	return ec.marshalNPageInfo2ᚖdataloaderᚐPageInfo(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _OrderConnection_edges(ctx context.Context, field graphql.CollectedField, obj *OrderConnection) graphql.Marshaler {
