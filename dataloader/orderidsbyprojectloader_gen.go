@@ -7,10 +7,10 @@ import (
 	"time"
 )
 
-// OrderConnectionLoaderConfig captures the config to create a new OrderConnectionLoader
-type OrderConnectionLoaderConfig struct {
+// OrderIDsByProjectLoaderConfig captures the config to create a new OrderIDsByProjectLoader
+type OrderIDsByProjectLoaderConfig struct {
 	// Fetch is a method that provides the data for the loader
-	Fetch func(keys []string) ([]*OrderConnection, []error)
+	Fetch func(keys []string) ([][]string, []error)
 
 	// Wait is how long wait before sending a batch
 	Wait time.Duration
@@ -19,19 +19,19 @@ type OrderConnectionLoaderConfig struct {
 	MaxBatch int
 }
 
-// NewOrderConnectionLoader creates a new OrderConnectionLoader given a fetch, wait, and maxBatch
-func NewOrderConnectionLoader(config OrderConnectionLoaderConfig) *OrderConnectionLoader {
-	return &OrderConnectionLoader{
+// NewOrderIDsByProjectLoader creates a new OrderIDsByProjectLoader given a fetch, wait, and maxBatch
+func NewOrderIDsByProjectLoader(config OrderIDsByProjectLoaderConfig) *OrderIDsByProjectLoader {
+	return &OrderIDsByProjectLoader{
 		fetch:    config.Fetch,
 		wait:     config.Wait,
 		maxBatch: config.MaxBatch,
 	}
 }
 
-// OrderConnectionLoader batches and caches requests
-type OrderConnectionLoader struct {
+// OrderIDsByProjectLoader batches and caches requests
+type OrderIDsByProjectLoader struct {
 	// this method provides the data for the loader
-	fetch func(keys []string) ([]*OrderConnection, []error)
+	fetch func(keys []string) ([][]string, []error)
 
 	// how long to done before sending a batch
 	wait time.Duration
@@ -42,51 +42,51 @@ type OrderConnectionLoader struct {
 	// INTERNAL
 
 	// lazily created cache
-	cache map[string]*OrderConnection
+	cache map[string][]string
 
 	// the current batch. keys will continue to be collected until timeout is hit,
 	// then everything will be sent to the fetch method and out to the listeners
-	batch *orderConnectionLoaderBatch
+	batch *orderIDsByProjectLoaderBatch
 
 	// mutex to prevent races
 	mu sync.Mutex
 }
 
-type orderConnectionLoaderBatch struct {
+type orderIDsByProjectLoaderBatch struct {
 	keys    []string
-	data    []*OrderConnection
+	data    [][]string
 	error   []error
 	closing bool
 	done    chan struct{}
 }
 
-// Load a OrderConnection by key, batching and caching will be applied automatically
-func (l *OrderConnectionLoader) Load(key string) (*OrderConnection, error) {
+// Load a string by key, batching and caching will be applied automatically
+func (l *OrderIDsByProjectLoader) Load(key string) ([]string, error) {
 	return l.LoadThunk(key)()
 }
 
-// LoadThunk returns a function that when called will block waiting for a OrderConnection.
+// LoadThunk returns a function that when called will block waiting for a string.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *OrderConnectionLoader) LoadThunk(key string) func() (*OrderConnection, error) {
+func (l *OrderIDsByProjectLoader) LoadThunk(key string) func() ([]string, error) {
 	l.mu.Lock()
 	if it, ok := l.cache[key]; ok {
 		l.mu.Unlock()
-		return func() (*OrderConnection, error) {
+		return func() ([]string, error) {
 			return it, nil
 		}
 	}
 	if l.batch == nil {
-		l.batch = &orderConnectionLoaderBatch{done: make(chan struct{})}
+		l.batch = &orderIDsByProjectLoaderBatch{done: make(chan struct{})}
 	}
 	batch := l.batch
 	pos := batch.keyIndex(l, key)
 	l.mu.Unlock()
 
-	return func() (*OrderConnection, error) {
+	return func() ([]string, error) {
 		<-batch.done
 
-		var data *OrderConnection
+		var data []string
 		if pos < len(batch.data) {
 			data = batch.data[pos]
 		}
@@ -111,72 +111,73 @@ func (l *OrderConnectionLoader) LoadThunk(key string) func() (*OrderConnection, 
 
 // LoadAll fetches many keys at once. It will be broken into appropriate sized
 // sub batches depending on how the loader is configured
-func (l *OrderConnectionLoader) LoadAll(keys []string) ([]*OrderConnection, []error) {
-	results := make([]func() (*OrderConnection, error), len(keys))
+func (l *OrderIDsByProjectLoader) LoadAll(keys []string) ([][]string, []error) {
+	results := make([]func() ([]string, error), len(keys))
 
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
 
-	orderConnections := make([]*OrderConnection, len(keys))
+	strings := make([][]string, len(keys))
 	errors := make([]error, len(keys))
 	for i, thunk := range results {
-		orderConnections[i], errors[i] = thunk()
+		strings[i], errors[i] = thunk()
 	}
-	return orderConnections, errors
+	return strings, errors
 }
 
-// LoadAllThunk returns a function that when called will block waiting for a OrderConnections.
+// LoadAllThunk returns a function that when called will block waiting for a strings.
 // This method should be used if you want one goroutine to make requests to many
 // different data loaders without blocking until the thunk is called.
-func (l *OrderConnectionLoader) LoadAllThunk(keys []string) func() ([]*OrderConnection, []error) {
-	results := make([]func() (*OrderConnection, error), len(keys))
+func (l *OrderIDsByProjectLoader) LoadAllThunk(keys []string) func() ([][]string, []error) {
+	results := make([]func() ([]string, error), len(keys))
 	for i, key := range keys {
 		results[i] = l.LoadThunk(key)
 	}
-	return func() ([]*OrderConnection, []error) {
-		orderConnections := make([]*OrderConnection, len(keys))
+	return func() ([][]string, []error) {
+		strings := make([][]string, len(keys))
 		errors := make([]error, len(keys))
 		for i, thunk := range results {
-			orderConnections[i], errors[i] = thunk()
+			strings[i], errors[i] = thunk()
 		}
-		return orderConnections, errors
+		return strings, errors
 	}
 }
 
 // Prime the cache with the provided key and value. If the key already exists, no change is made
 // and false is returned.
 // (To forcefully prime the cache, clear the key first with loader.clear(key).prime(key, value).)
-func (l *OrderConnectionLoader) Prime(key string, value *OrderConnection) bool {
+func (l *OrderIDsByProjectLoader) Prime(key string, value []string) bool {
 	l.mu.Lock()
 	var found bool
 	if _, found = l.cache[key]; !found {
 		// make a copy when writing to the cache, its easy to pass a pointer in from a loop var
 		// and end up with the whole cache pointing to the same value.
-		cpy := *value
-		l.unsafeSet(key, &cpy)
+		cpy := make([]string, len(value))
+		copy(cpy, value)
+		l.unsafeSet(key, cpy)
 	}
 	l.mu.Unlock()
 	return !found
 }
 
 // Clear the value at key from the cache, if it exists
-func (l *OrderConnectionLoader) Clear(key string) {
+func (l *OrderIDsByProjectLoader) Clear(key string) {
 	l.mu.Lock()
 	delete(l.cache, key)
 	l.mu.Unlock()
 }
 
-func (l *OrderConnectionLoader) unsafeSet(key string, value *OrderConnection) {
+func (l *OrderIDsByProjectLoader) unsafeSet(key string, value []string) {
 	if l.cache == nil {
-		l.cache = map[string]*OrderConnection{}
+		l.cache = map[string][]string{}
 	}
 	l.cache[key] = value
 }
 
 // keyIndex will return the location of the key in the batch, if its not found
 // it will add the key to the batch
-func (b *orderConnectionLoaderBatch) keyIndex(l *OrderConnectionLoader, key string) int {
+func (b *orderIDsByProjectLoaderBatch) keyIndex(l *OrderIDsByProjectLoader, key string) int {
 	for i, existingKey := range b.keys {
 		if key == existingKey {
 			return i
@@ -200,7 +201,7 @@ func (b *orderConnectionLoaderBatch) keyIndex(l *OrderConnectionLoader, key stri
 	return pos
 }
 
-func (b *orderConnectionLoaderBatch) startTimer(l *OrderConnectionLoader) {
+func (b *orderIDsByProjectLoaderBatch) startTimer(l *OrderIDsByProjectLoader) {
 	time.Sleep(l.wait)
 	l.mu.Lock()
 
@@ -216,7 +217,7 @@ func (b *orderConnectionLoaderBatch) startTimer(l *OrderConnectionLoader) {
 	b.end(l)
 }
 
-func (b *orderConnectionLoaderBatch) end(l *OrderConnectionLoader) {
+func (b *orderIDsByProjectLoaderBatch) end(l *OrderIDsByProjectLoader) {
 	b.data, b.error = l.fetch(b.keys)
 	close(b.done)
 }

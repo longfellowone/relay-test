@@ -2,24 +2,31 @@ interface Node {
     id: ID!
 }
 
-type Test implements Node {
-    id: ID!
-    test: String!
-}
-
 type Query {
-#    customers: [Customer!]
-    projects: [Project!]
-    node(id: ID!): Node
+    projects: [Project]
+#    projects(after: String, first: Int, before: String, last: Int): ProjectConnection
+    orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }
 
-type Project implements Node{
+type ProjectConnection {
+    totalCount: Int!
+    pageInfo: PageInfo!
+    edges: [ProjectEdge]
+}
+
+type ProjectEdge {
+    node: Project
+    cursor: String!
+}
+
+type Project implements Node {
     id: ID!
     name: String!
     orders(after: String, first: Int, before: String, last: Int): OrderConnection
 }
 
 type OrderConnection {
+    totalCount: Int!
     pageInfo: PageInfo!
     edges: [OrderEdge]
 }
@@ -29,6 +36,13 @@ type OrderEdge {
     cursor: String!
 }
 
+type Order implements Node {
+    id: ID!
+    comments: String!
+    sentDate: Int!
+#    date: Time!
+}
+
 type PageInfo {
     hasNextPage: Boolean!
     hasPreviousPage: Boolean!
@@ -36,27 +50,4 @@ type PageInfo {
     endCursor: String
 }
 
-#type Customer {
-#    id: Int!
-#    name: String!
-##    address: Address
-#    orders: [Order!]
-#}
-
-type Address {
-    id: Int!
-    street: String!
-    country: String!
-}
-
-type Order implements Node {
-    id: ID!
-    date: Time!
-#    items: [Item!]
-}
-
-type Item {
-    name: String!
-}
-
-scalar Time
+#scalar Time

@@ -1,12 +1,11 @@
 resolver:
-  filename: resolver.go # where to write them
+  filename: resolver.go
   type: Resolver
 
-# Use time scalar
 models:
   Order:
     model: dataloader.Order
+  OrderConnection:
+    model: dataloader.OrderConnection
   Project:
     model: dataloader.Project
-#  Customer:
-#    model: dataloader.Customer

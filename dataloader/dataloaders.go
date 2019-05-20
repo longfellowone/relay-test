@@ -1,17 +1,14 @@
-////go:generate go run github.com/vektah/dataloaden -keys int dataloader.Address
-////go:generate go run github.com/vektah/dataloaden -keys int -slice dataloader.Item
-////go:generate go run github.com/vektah/dataloaden OrderSliceLoader string []*dataloader.Order
-//go:generate go run github.com/vektah/dataloaden OrderConnectionLoader string *dataloader.OrderConnection
-
-// https://medium.freecodecamp.org/deep-dive-into-graphql-with-golang-d3e02a429ac3
+////go:generate go run github.com/vektah/dataloaden OrderConnectionLoader string *dataloader.OrderConnection
+////go:generate go run github.com/vektah/dataloaden ProjectConnectionLoader string *dataloader.ProjectConnection
+//go:generate go run github.com/vektah/dataloaden OrderIDsByProjectLoader string []string
+//go:generate go run github.com/vektah/dataloaden OrderLoader string *dataloader.Order
 
 package dataloader
 
 import (
 	"context"
-	"fmt"
+	"github.com/jmoiron/sqlx"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -20,142 +17,103 @@ type ctxKeyType struct{ name string }
 var ctxKey = ctxKeyType{"userCtx"}
 
 type loaders struct {
-	ordersByProject *OrderConnectionLoader
-	//ordersByCustomer *OrderSliceLoader
-	//addressByID      *AddressLoader
-	//itemsByOrder     *ItemSliceLoader
+	orderIDsByProject *OrderIDsByProjectLoader
+	orderLoader       *OrderLoader
 }
 
-func LoaderMiddleware(next http.Handler) http.Handler {
+func LoaderMiddleware(db *sqlx.DB, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ldrs := loaders{}
 
 		wait := 250 * time.Microsecond
 
-		// 1:1 loader
-		ldrs.ordersByProject = &OrderConnectionLoader{
+		ldrs.orderIDsByProject = &OrderIDsByProjectLoader{
 			wait:     wait,
 			maxBatch: 100,
-			fetch: func(keys []string) ([]*OrderConnection, []error) {
-				fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keys, ","))
+			fetch: func(keys []string) ([][]string, []error) {
 				time.Sleep(5 * time.Millisecond)
-
-				// make edge array
-				orderConnections := make([]*OrderConnection, len(keys))
 				errors := make([]error, len(keys))
-				for i, key := range keys {
 
-					// range over [i]
-					edges := []*OrderEdge{
-						{Node: &Order{ID: key, Date: time.Now()}, Cursor: "testing"},
+				query, args, err := sqlx.In("SELECT orderid,projectid FROM orders WHERE orders.projectid IN (?) ORDER by sentdate DESC", keys)
+				query = db.Rebind(query)
+
+				rows, err := db.Query(query, args...)
+				if err != nil {
+					errors = append(errors, err)
+				}
+
+				orderIDs := make(map[string][]string)
+
+				for rows.Next() {
+					var orderid string
+					var projectid string
+
+					if err := rows.Scan(&orderid, &projectid); err != nil {
+						errors = append(errors, err)
 					}
 
-					orderConnections[i] = &OrderConnection{Edges: edges, PageInfo: &PageInfo{HasPreviousPage: true}}
+					orderIDs[projectid] = append(orderIDs[projectid], orderid)
 				}
-				return orderConnections, errors
+
+				projectOrderIDs := make([][]string, len(keys))
+				for i, v := range keys {
+					projectOrderIDs[i] = orderIDs[v]
+				}
+
+				return projectOrderIDs, errors
 			},
 		}
 
-		// 1:M loader
-		//ldrs.ordersByCustomer = &OrderSliceLoader{
-		//	wait:     wait,
-		//	maxBatch: 100,
-		//	fetch: func(keys []string) ([][]*Order, []error) {
-		//		// If user has scope manage:orders pull by user orginization id, else pull by user id
-		//		fmt.Printf("SELECT * FROM orders WHERE customer_id IN (%s)\n", strings.Join(keys, ","))
-		//		time.Sleep(5 * time.Millisecond)
-		//
-		//		orders := make([][]*Order, len(keys))
-		//		errors := make([]error, len(keys))
-		//		for i := range keys {
-		//			orders[i] = []*Order{
-		//				{ID: "orderid1", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
-		//				{ID: "orderid2", Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(1) * time.Hour)},
-		//			}
-		//
-		//			// if you had another customer loader you would prime its cache here
-		//			// by calling `ldrs.ordersByID.Prime(id, orders[i])`
-		//		}
-		//
-		//		return orders, errors
-		//	},
-		//}
+		ldrs.orderLoader = &OrderLoader{
+			wait:     wait,
+			maxBatch: 100,
+			fetch: func(keys []string) ([]*Order, []error) {
+				time.Sleep(5 * time.Millisecond)
+				errors := make([]error, len(keys))
 
-		// simple 1:1 loader, fetch an address by its primary key
-		//ldrs.addressByID = &AddressLoader{
+				query, args, err := sqlx.In("SELECT orderid,projectid,sentdate FROM orders WHERE orderid IN (?) ORDER by sentdate DESC", keys)
+				query = db.Rebind(query)
+
+				rows, err := db.Query(query, args...)
+				if err != nil {
+					errors = append(errors, err)
+				}
+
+				orders := make([]*Order, 0)
+
+				var orderid string
+				var projectid string
+				var sentDate int64
+
+				for rows.Next() {
+					if err := rows.Scan(&orderid, &projectid, &sentDate); err != nil {
+						errors = append(errors, err)
+					}
+					orders = append(orders, &Order{ID: orderid, ProjectId: projectid, SentDate: sentDate})
+				}
+
+				return orders, errors
+			},
+		}
+
+		//ldrs.ordersByProject = &OrderConnectionLoader{
 		//	wait:     wait,
 		//	maxBatch: 100,
-		//	fetch: func(keys []int) ([]*Address, []error) {
-		//		var keySql []string
-		//		for _, key := range keys {
-		//			keySql = append(keySql, strconv.Itoa(key))
-		//		}
-		//
-		//		fmt.Printf("SELECT * FROM address WHERE id IN (%s)\n", strings.Join(keySql, ","))
+		//	fetch: func(keys []string) ([]*OrderConnection, []error) {
+		//		fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keys, ","))
 		//		time.Sleep(5 * time.Millisecond)
 		//
-		//		addresses := make([]*Address, len(keys))
+		//		orderConnections := make([]*OrderConnection, len(keys))
 		//		errors := make([]error, len(keys))
 		//		for i, key := range keys {
-		//			addresses[i] = &Address{ID: key, Street: "home street", Country: "hometon " + strconv.Itoa(key)}
-		//		}
-		//		return addresses, errors
-		//	},
-		//}
-
-		//// 1:M loader
-		//ldrs.ordersByProject = &OrderConnectionSliceLoader{
-		//	wait:     wait,
-		//	maxBatch: 100,
-		//	fetch: func(keys []int) ([][]OrderConnection, []error) {
-		//		var keySql []string
-		//		for _, key := range keys {
-		//			keySql = append(keySql, strconv.Itoa(key))
-		//		}
 		//
-		//		fmt.Printf("SELECT * FROM orders WHERE project_id IN (%s)\n", strings.Join(keySql, ","))
-		//		time.Sleep(5 * time.Millisecond)
-		//
-		//		orders := make([][]OrderConnection, len(keys))
-		//		errors := make([]error, len(keys))
-		//		for i, key := range keys {
-		//			orders[i] = []OrderConnection{
-		//				{Edges: []*OrderEdge{{Node: &Order{ID: key}}}, PageInfo: PageInfo{}},
-		//				//{ID: id, Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(key) * time.Hour)},
-		//				//{ID: id + 1, Amount: rand.Float64(), Date: time.Now().Add(-time.Duration(key) * time.Hour)},
+		//			edges := []*OrderEdge{
+		//				{Node: &Order{ID: key}, Cursor: "testing"},
 		//			}
 		//
-		//			// if you had another customer loader you would prime its cache here
-		//			// by calling `ldrs.ordersByID.Prime(id, orders[i])`
+		//			orderConnections[i] = &OrderConnection{Edges: edges, PageInfo: &PageInfo{HasPreviousPage: true}}
 		//		}
-		//
-		//		return orders, errors
-		//	},
-		//}
-
-		//// M:M loader
-		//ldrs.itemsByOrder = &ItemSliceLoader{
-		//	wait:     wait,
-		//	maxBatch: 100,
-		//	fetch: func(keys []int) ([][]Item, []error) {
-		//		var keySql []string
-		//		for _, key := range keys {
-		//			keySql = append(keySql, strconv.Itoa(key))
-		//		}
-		//
-		//		fmt.Printf("SELECT * FROM items JOIN item_order WHERE item_order.order_id IN (%s)\n", strings.Join(keySql, ","))
-		//		time.Sleep(5 * time.Millisecond)
-		//
-		//		items := make([][]Item, len(keys))
-		//		errors := make([]error, len(keys))
-		//		for i := range keys {
-		//			items[i] = []Item{
-		//				{Name: "item " + strconv.Itoa(rand.Int()%20+20)},
-		//				{Name: "item " + strconv.Itoa(rand.Int()%20+20)},
-		//			}
-		//		}
-		//
-		//		return items, errors
+		//		return orderConnections, errors
 		//	},
 		//}
 

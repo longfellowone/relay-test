@@ -1,38 +1,67 @@
 //go:generate go run github.com/99designs/gqlgen
 
-// TODO: Move data loaders to new folder
-
-// If user has scope manage:orders pull by user orginization id, else pull by user id
-
 package dataloader
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"time"
+	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	"strconv"
+	"strings"
 )
 
 type Project struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID       string
+	Name     string
+	OrderIDs []string
+	//Comments  string
+	//ProjectID string
 }
 
 func (Project) IsNode() {}
 
 type Order struct {
-	ID     string    `json:"id"`
-	Date   time.Time `json:"date"`
-	Amount float64   `json:"amount"`
+	ID           string `db:"orderid"`
+	ProjectId    string `db:"projectid"`
+	Status       int    `db:"status"`
+	ProjectName  string `db:"project_name"`
+	ForemanEmail string `db:"foreman_email"`
+	SentDate     int64  `db:"sentdate"`
+	Comments     string `db:"comments"`
 }
 
 func (Order) IsNode() {}
 
-//SELECT * FROM customers
-//SELECT * FROM address WHERE id IN (4,3,1)
-//SELECT * FROM orders WHERE customer_id IN (2,1,3)
+type OrderConnection struct {
+	TotalCount int `json:"totalCount"`
+	PageInfo   *PageInfo
+	IDs        []string
+	Begin      int
+	End        int
+}
 
-type Resolver struct{}
+//func (c *OrderConnection) PageInfo() PageInfo {
+//
+//	return PageInfo{
+//		//StartCursor: EncodeCursor(c.From),
+//		//EndCursor:   EncodeCursor(c.To - 1),
+//		//HasNextPage: c.To < len(c.IDs),
+//	}
+//}
 
+//func EncodeCursor(i string) string {
+//	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("cursor%d", i+1)))
+//}
+
+type Resolver struct {
+	DB *sqlx.DB
+}
+
+func (r *Resolver) OrderConnection() OrderConnectionResolver {
+	return &orderConnectionResolver{r}
+}
 func (r *Resolver) Query() QueryResolver {
 	return &queryResolver{r}
 }
@@ -40,67 +69,276 @@ func (r *Resolver) Project() ProjectResolver {
 	return &projectResolver{r}
 }
 
+type orderConnectionResolver struct{ *Resolver }
+
+func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnection) ([]*OrderEdge, error) {
+	nodes, err := r.resolveOrders(ctx, obj.IDs)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	edges := make([]*OrderEdge, obj.End-obj.Begin)
+
+	for i := range edges {
+		edges[i] = &OrderEdge{
+			Node:   nodes[i],
+			Cursor: strconv.Itoa(obj.Begin + i),
+		}
+	}
+
+	return edges, nil
+}
+
+func (r *Resolver) resolveOrders(ctx context.Context, ids []string) ([]*Order, error) {
+	orders, errs := ctxLoaders(ctx).orderLoader.LoadAll(ids)
+	for _, err := range errs {
+		if err != nil {
+			return []*Order{}, err
+		}
+	}
+
+	return orders, nil
+}
+
+type Filter map[string]interface{}
+
+//resolve: (user, { first }) => queryLoader.load([
+//'SELECT toID FROM friends WHERE fromID=? LIMIT ?', user.id, first
+//]).then(rows => rows.map(row => userLoader.load(row.toID)))
+
+func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+
+	// loader
+	// edgeBuilder
+
+	temp := func(filter Filter) ([]string, int, int, *PageInfo) {
+		args := NewConnectionArguments(filter)
+
+		arraySlice := orderIDs
+		arrayLength := len(arraySlice)
+
+		beforeOffset := GetOffsetWithDefault(args.Before, arrayLength)
+		afterOffset := GetOffsetWithDefault(args.After, -1)
+
+		startOffset := max(afterOffset, -1) + 1
+		endOffset := min(beforeOffset, arrayLength)
+
+		if args.First != -1 {
+			endOffset = min(endOffset, startOffset+args.First)
+		}
+
+		if args.Last != -1 {
+			startOffset = max(startOffset, endOffset-args.Last)
+		}
+
+		begin := startOffset
+		end := arrayLength - (arrayLength - endOffset)
+
+		if begin > end {
+			return nil, 0, 0, &PageInfo{}
+		}
+
+		slice := arraySlice[begin:end]
+
+		//var firstEdgeCursor, lastEdgeCursor ConnectionCursor
+		var firstEdgeCursor, lastEdgeCursor *string
+		if len(slice) > 0 {
+			firstEdgeCursor = OffsetToCursor(startOffset)
+			lastEdgeCursor = OffsetToCursor(startOffset + len(slice) - 1)
+		}
+
+		hasPreviousPage := false
+		if startOffset > 0 {
+			hasPreviousPage = true
+		}
+
+		hasNextPage := false
+		if endOffset < arrayLength {
+			hasNextPage = true
+		}
+
+		pageInfo := &PageInfo{
+			HasNextPage:     hasNextPage,
+			HasPreviousPage: hasPreviousPage,
+			StartCursor:     firstEdgeCursor,
+			EndCursor:       lastEdgeCursor,
+		}
+
+		return slice, begin, end, pageInfo
+	}
+
+	filter := map[string]interface{}{
+		"first": 4,
+		//"after": "cursor:0",
+	}
+
+	ids, begin, end, pageInfo := temp(filter)
+
+	//count := len(orderIDs)
+
+	return &OrderConnection{
+		TotalCount: len(orderIDs),
+		PageInfo:   pageInfo,
+		IDs:        ids,
+		Begin:      begin,
+		End:        end,
+	}, nil
+}
+
 type queryResolver struct{ *Resolver }
 
-func (r *queryResolver) Node(ctx context.Context, id string) (Node, error) {
-	// Direct DB call use methods to verify user
-	return Project{ID: "99", Name: ""}, nil
+func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+	// If user == purchaser load by org, else load ids by ctxUser
+	//orderIDs := ctxLoaders(ctx).orderIdsByOrganization.Load(obj.ID)
+
+	var orders []*Order
+	err := r.DB.Select(&orders, "SELECT * FROM orders ORDER BY sentdate DESC")
+	if err != nil {
+		return &OrderConnection{}, err
+	}
+
+	orderIDs := make([]string, len(orders))
+	for i := range orderIDs {
+		orderIDs[i] = orders[i].ID
+	}
+
+	return r.resolveOrderConnection(orderIDs, after, first, before, last)
 }
 
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
-	// If user has scope manage:orders pull by user orginization id, else pull by user id
-	fmt.Println("SELECT * FROM projects")
 
-	time.Sleep(5 * time.Millisecond)
+	fmt.Println("SELECT * FROM projects WHERE orgID = ctxUserOrgID")
+	// Prime cache with project by id
 
-	return []*Project{
-		{ID: "3", Name: "Project Name 3"},
-		{ID: "5", Name: "Project Name 5"},
-		{ID: "7", Name: "Project Name 7"},
-		{ID: "2", Name: "Project Name 2"},
-		{ID: "19", Name: "Project Name 19"},
-	}, nil
+	const query = `
+		SELECT p.id, p.name, array_agg(o.orderid ORDER BY o.sentdate DESC) as order_ids
+		FROM projects p INNER JOIN orders o on p.id = o.projectid
+		GROUP BY p.id
+		ORDER BY p.name ASC 
+	`
+
+	rows, err := r.DB.Query(query)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var id string
+	var name string
+	var order_ids []string
+
+	var projects []*Project
+
+	for rows.Next() {
+		if err := rows.Scan(&id, &name, pq.Array(&order_ids)); err != nil {
+			fmt.Println(err)
+		}
+
+		projects = append(projects, &Project{
+			ID:       id,
+			Name:     name,
+			OrderIDs: order_ids,
+		})
+	}
+
+	return projects, nil
 }
 
 type projectResolver struct{ *Resolver }
 
 func (r *projectResolver) Orders(ctx context.Context, obj *Project, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
-	return ctxLoaders(ctx).ordersByProject.Load(obj.ID)
+	// Newest to oldest 120, 110, 100, 90, 80, 70
+
+	//orderIDs, err := ctxLoaders(ctx).orderIDsByProject.Load(obj.ID)
+	//if err != nil {
+	//	fmt.Println(err)
+	//}
+
+	return r.resolveOrderConnection(obj.OrderIDs, after, first, before, last)
 }
 
-//type Customer struct {
-//	ID        int    `json:"id"`
-//	Name      string `json:"name"`
-//	AddressID int
-//}
+const PREFIX = "cursor:"
 
-//func (r *queryResolver) Customers(ctx context.Context) ([]*Customer, error) {
-//	fmt.Println("SELECT * FROM customers")
-//	//time.Sleep(5 * time.Millisecond)
-//
-//	return []*Customer{
-//		{ID: 1, Name: "Bob", AddressID: 1},
-//		{ID: 2, Name: "Alice", AddressID: 3},
-//		{ID: 3, Name: "Eve", AddressID: 4},
-//	}, nil
-//}
+type ConnectionCursor string
 
-//type customerResolver struct{ *Resolver }
-//
-//func (r *customerResolver) Orders(ctx context.Context, obj *Customer) ([]*Order, error) {
-//	return ctxLoaders(ctx).ordersByCustomer.Load(obj.ID)
-//}
+type ConnectionArguments struct {
+	Before ConnectionCursor
+	After  ConnectionCursor
+	First  int
+	Last   int
+}
 
-//func (r *Resolver) Order() OrderResolver {
-//	return &orderResolver{r}
-//}
+func NewConnectionArguments(filters map[string]interface{}) ConnectionArguments {
+	conn := ConnectionArguments{
+		First:  -1,
+		Last:   -1,
+		Before: "",
+		After:  "",
+	}
+	if filters != nil {
+		if first, ok := filters["first"]; ok {
+			if first, ok := first.(int); ok {
+				conn.First = first
+			}
+		}
+		if last, ok := filters["last"]; ok {
+			if last, ok := last.(int); ok {
+				conn.Last = last
+			}
+		}
+		if before, ok := filters["before"]; ok {
+			conn.Before = ConnectionCursor(fmt.Sprintf("%v", before))
+		}
+		if after, ok := filters["after"]; ok {
+			conn.After = ConnectionCursor(fmt.Sprintf("%v", after))
+		}
+	}
+	return conn
+}
 
-//func (r *customerResolver) Address(ctx context.Context, obj *Customer) (*Address, error) {
-//	return ctxLoaders(ctx).addressByID.Load(obj.AddressID)
-//}
+func OffsetToCursor(offset int) *string {
+	str := fmt.Sprintf("%v%v", PREFIX, offset)
+	//return ConnectionCursor(base64.StdEncoding.EncodeToString([]byte(str)))
+	return &str
+}
 
-//type orderResolver struct{ *Resolver }
-//
-//func (r *orderResolver) Items(ctx context.Context, obj *Order) ([]Item, error) {
-//	return ctxLoaders(ctx).itemsByOrder.Load(obj.ID)
-//}
+// Re-derives the offset from the cursor string.
+func CursorToOffset(cursor ConnectionCursor) (int, error) {
+	str := string(cursor)
+	//str := ""
+	//b, err := base64.StdEncoding.DecodeString(string(cursor))
+	//if err == nil {
+	//	str = string(b)
+	//}
+	str = strings.Replace(str, PREFIX, "", -1)
+	offset, err := strconv.Atoi(str)
+	if err != nil {
+		return 0, errors.New("Invalid cursor")
+	}
+
+	return offset, nil
+}
+
+func GetOffsetWithDefault(cursor ConnectionCursor, defaultOffset int) int {
+	if cursor == "" {
+		return defaultOffset
+	}
+	offset, err := CursorToOffset(cursor)
+	if err != nil {
+		return defaultOffset
+	}
+	return offset
+}
+
+func max(a, b int) int {
+	if a < b {
+		return b
+	}
+	return a
+}
+
+func min(a, b int) int {
+	if a > b {
+		return b
+	}
+	return a
+}
