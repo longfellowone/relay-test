@@ -13,9 +13,9 @@ import (
 )
 
 type Project struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	OrderIDs []string `json:"order_ids"`
+	ID       string
+	Name     string
+	OrderIDs []string
 	//Comments  string
 	//ProjectID string
 }
@@ -35,14 +35,11 @@ type Order struct {
 func (Order) IsNode() {}
 
 type OrderConnection struct {
-	IDs      []string
-	Begin    int
-	End      int
-	PageInfo *PageInfo `json:"pageInfo"`
-}
-
-func (c *OrderConnection) TotalCount() int {
-	return len(c.IDs)
+	TotalCount int `json:"totalCount"`
+	PageInfo   *PageInfo
+	IDs        []string
+	Begin      int
+	End        int
 }
 
 //func (c *OrderConnection) PageInfo() PageInfo {
@@ -75,7 +72,7 @@ func (r *Resolver) Project() ProjectResolver {
 type orderConnectionResolver struct{ *Resolver }
 
 func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnection) ([]*OrderEdge, error) {
-	orders, err := r.resolveOrders(ctx, obj.IDs)
+	nodes, err := r.resolveOrders(ctx, obj.IDs)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -84,7 +81,7 @@ func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnectio
 
 	for i := range edges {
 		edges[i] = &OrderEdge{
-			Node:   orders[i],
+			Node:   nodes[i],
 			Cursor: strconv.Itoa(obj.Begin + i),
 		}
 	}
@@ -93,8 +90,12 @@ func (r *orderConnectionResolver) Edges(ctx context.Context, obj *OrderConnectio
 }
 
 func (r *Resolver) resolveOrders(ctx context.Context, ids []string) ([]*Order, error) {
-	// TODO: Fix errors, returns [nil] rather than nil
-	orders, _ := ctxLoaders(ctx).orderLoader.LoadAll(ids)
+	orders, errs := ctxLoaders(ctx).orderLoader.LoadAll(ids)
+	for _, err := range errs {
+		if err != nil {
+			return []*Order{}, err
+		}
+	}
 
 	return orders, nil
 }
@@ -106,6 +107,9 @@ type Filter map[string]interface{}
 //]).then(rows => rows.map(row => userLoader.load(row.toID)))
 
 func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, first *int, before *string, last *int) (*OrderConnection, error) {
+
+	// loader
+	// edgeBuilder
 
 	temp := func(filter Filter) ([]string, int, int, *PageInfo) {
 		args := NewConnectionArguments(filter)
@@ -170,11 +174,14 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 
 	ids, begin, end, pageInfo := temp(filter)
 
+	//count := len(orderIDs)
+
 	return &OrderConnection{
-		IDs:      ids,
-		Begin:    begin,
-		End:      end,
-		PageInfo: pageInfo,
+		TotalCount: len(orderIDs),
+		PageInfo:   pageInfo,
+		IDs:        ids,
+		Begin:      begin,
+		End:        end,
 	}, nil
 }
 
@@ -222,7 +229,6 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 	var projects []*Project
 
 	for rows.Next() {
-
 		if err := rows.Scan(&id, &name, pq.Array(&order_ids)); err != nil {
 			fmt.Println(err)
 		}
@@ -232,8 +238,6 @@ func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {
 			Name:     name,
 			OrderIDs: order_ids,
 		})
-
-		fmt.Println(id, name, order_ids)
 	}
 
 	return projects, nil

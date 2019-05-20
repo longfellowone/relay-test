@@ -22,6 +22,7 @@ ON t.id = it.tag_id
 GROUP BY i.id, i.title,
 
 https://lorenstewart.me/2017/12/03/postgresqls-array_agg-function/
+https://www.opsdash.com/blog/postgres-arrays-golang.html
 https://stackoverflow.com/questions/44379851/get-postgresql-array-into-struct-with-structscan
 https://github.com/jmoiron/sqlx/issues/168
 s := strings.Split("a,b,c", ",")

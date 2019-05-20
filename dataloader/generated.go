@@ -615,13 +615,13 @@ func (ec *executionContext) _OrderConnection_totalCount(ctx context.Context, fie
 		Object:   "OrderConnection",
 		Field:    field,
 		Args:     nil,
-		IsMethod: true,
+		IsMethod: false,
 	}
 	ctx = graphql.WithResolverContext(ctx, rctx)
 	ctx = ec.Tracer.StartFieldResolverExecution(ctx, rctx)
 	resTmp := ec.FieldMiddleware(ctx, obj, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.TotalCount(), nil
+		return obj.TotalCount, nil
 	})
 	if resTmp == nil {
 		if !ec.HasError(rctx) {
