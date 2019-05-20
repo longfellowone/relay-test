@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+//  return errors.Wrap(err, "request failed")
+
 type Project struct {
 	ID       string
 	Name     string
@@ -21,6 +23,16 @@ type Project struct {
 }
 
 func (Project) IsNode() {}
+
+//SELECT `books`.title,
+//`book_order`.orderdate,
+//`book_order`.orderid
+//FROM   `books`
+//LEFT OUTER JOIN `order_items`
+//ON `books`.bookid = `order_items`.bookid
+//LEFT OUTER JOIN `book_order`
+//ON `order_items`.orderid = `book_order`.orderid
+//ORDER  BY `order_items`.bookid DESC;
 
 type Order struct {
 	ID           string `db:"orderid"`
@@ -169,7 +181,7 @@ func (r *Resolver) resolveOrderConnection(orderIDs []string, after *string, firs
 
 	filter := map[string]interface{}{
 		"first": 4,
-		//"after": "cursor:0",
+		"after": "cursor:0",
 	}
 
 	ids, begin, end, pageInfo := temp(filter)
@@ -191,18 +203,14 @@ func (r *queryResolver) Orders(ctx context.Context, after *string, first *int, b
 	// If user == purchaser load by org, else load ids by ctxUser
 	//orderIDs := ctxLoaders(ctx).orderIdsByOrganization.Load(obj.ID)
 
-	var orders []*Order
-	err := r.DB.Select(&orders, "SELECT * FROM orders ORDER BY sentdate DESC")
+	// DO NO USE SELECT WITHOUT LIMIT
+	var ids []string
+	err := r.DB.Select(&ids, "SELECT orderid FROM orders ORDER BY sentdate DESC")
 	if err != nil {
 		return &OrderConnection{}, err
 	}
 
-	orderIDs := make([]string, len(orders))
-	for i := range orderIDs {
-		orderIDs[i] = orders[i].ID
-	}
-
-	return r.resolveOrderConnection(orderIDs, after, first, before, last)
+	return r.resolveOrderConnection(ids, after, first, before, last)
 }
 
 func (r *queryResolver) Projects(ctx context.Context) ([]*Project, error) {

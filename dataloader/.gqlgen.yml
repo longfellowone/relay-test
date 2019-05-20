@@ -2,6 +2,12 @@ resolver:
   filename: resolver.go
   type: Resolver
 
+# https://tristangio.fr/2017/03/go-simplify-sql-with-sqlx/
+# https://jmoiron.github.io/sqlx/
+
+# https://www.reddit.com/r/golang/comments/86mpvg/how_do_you_deal_with_rdbms_relationships_in_go/
+
+# http://www.sqlservertutorial.net/sql-server-sample-database/
 models:
   Order:
     model: dataloader.Order
